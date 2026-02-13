@@ -1,0 +1,17 @@
+# Database (local data - not committed)
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# Cache
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+
+# Generated HTML (can be regenerated)
+# dashboard/claude-command-center.html
