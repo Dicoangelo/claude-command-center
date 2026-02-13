@@ -15,9 +15,100 @@
 
 *A self-healing, real-time analytics dashboard that monitors every heartbeat of your Claude Code infrastructure.*
 
+<br/>
+
+### Dashboard Preview
+
+<img src="assets/dashboard-showcase.gif" width="100%" alt="Dashboard cycling through all 15 tabs"/>
+
+<sub>All 15 tabs cycling automatically — Overview through Infrastructure</sub>
+
 </div>
 
 <img src="https://user-images.githubusercontent.com/74038190/212284100-561aa473-3905-4a80-b561-0d28506553ee.gif" width="100%"/>
+
+<br/>
+
+<details>
+<summary><h3>📸 Tab Gallery — Click to browse all 15 tabs</h3></summary>
+
+<div align="center">
+
+#### 1. Overview
+<img src="assets/tabs/01-overview.png" width="100%" alt="Overview"/>
+
+---
+
+#### 2. Memory
+<img src="assets/tabs/02-memory.png" width="100%" alt="Memory"/>
+
+---
+
+#### 3. Activity
+<img src="assets/tabs/03-activity.png" width="100%" alt="Activity"/>
+
+---
+
+#### 4. Cost
+<img src="assets/tabs/04-cost.png" width="100%" alt="Cost"/>
+
+---
+
+#### 5. Projects
+<img src="assets/tabs/05-projects.png" width="100%" alt="Projects"/>
+
+---
+
+#### 6. Commands
+<img src="assets/tabs/06-commands.png" width="100%" alt="Commands"/>
+
+---
+
+#### 7. Routing
+<img src="assets/tabs/07-routing.png" width="100%" alt="Routing"/>
+
+---
+
+#### 8. Co-Evolution
+<img src="assets/tabs/08-coevolution.png" width="100%" alt="Co-Evolution"/>
+
+---
+
+#### 9. Context Packs
+<img src="assets/tabs/09-context-packs.png" width="100%" alt="Context Packs"/>
+
+---
+
+#### 10. Session Outcomes
+<img src="assets/tabs/10-session-outcomes.png" width="100%" alt="Session Outcomes"/>
+
+---
+
+#### 11. Productivity
+<img src="assets/tabs/11-productivity.png" width="100%" alt="Productivity"/>
+
+---
+
+#### 12. Tool Analytics
+<img src="assets/tabs/12-tool-analytics.png" width="100%" alt="Tool Analytics"/>
+
+---
+
+#### 13. Supermemory
+<img src="assets/tabs/13-supermemory.png" width="100%" alt="Supermemory"/>
+
+---
+
+#### 14. Cognitive
+<img src="assets/tabs/14-cognitive.png" width="100%" alt="Cognitive"/>
+
+---
+
+#### 15. Infrastructure
+<img src="assets/tabs/15-infrastructure.png" width="100%" alt="Infrastructure"/>
+
+</div>
+</details>
 
 <br/>
 
