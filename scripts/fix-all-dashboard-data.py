@@ -21,7 +21,7 @@ from collections import defaultdict, Counter
 
 # Import centralized pricing
 sys.path.insert(0, str(Path.home() / ".claude/config"))
-from pricing import ESTIMATES as COSTS_PER_MSG, VERSION as PRICING_VERSION
+from pricing import ESTIMATES as COSTS_PER_MSG, VERSION as PRICING_VERSION, get_model_cost, MONTHLY_RATE_USD
 
 # Quiet mode for hooks
 QUIET = '--quiet' in sys.argv or '-q' in sys.argv
@@ -338,7 +338,8 @@ log("  ✅ Done")
 
 log("STEP 5: Fixing subscription-data.json...")
 
-# Cost calculation using centralized pricing config
+# Cost calculation: token-level API pricing is the source of truth (via ccc-sql-data.py).
+# This file still writes a legacy subscription-data.json for fallback, using per-message estimates.
 total_value = sum(model_counts[m] * COSTS_PER_MSG[m] for m in COSTS_PER_MSG)
 
 sub_data = {
@@ -349,8 +350,8 @@ sub_data = {
     "totalQueries": sum(model_counts.values()),
     "totalSessions": total_sessions,
     "totalMessages": total_messages,
-    "monthlySubscription": 200,
-    "roiMultiplier": round(total_value / 200, 1) if total_value > 0 else 0,
+    "monthlySubscription": MONTHLY_RATE_USD,
+    "roiMultiplier": round(total_value / MONTHLY_RATE_USD, 1) if total_value > 0 else 0,
     "lastUpdated": datetime.now().isoformat()
 }
 (KERNEL_DIR / "subscription-data.json").write_text(json.dumps(sub_data, indent=2))
@@ -672,7 +673,11 @@ try:
             haiku_cache_read=dt.get('haiku_cache_read', 0),
             session_count=day_data['sessions'],
             tool_calls=day_data['tools'],
-            cost_estimate=day_data['messages'] * COSTS_PER_MSG["opus"]
+            cost_estimate=(
+                get_model_cost("opus", dt.get('opus_tokens_in', 0), dt.get('opus_tokens_out', 0), dt.get('opus_cache_read', 0))
+                + get_model_cost("sonnet", dt.get('sonnet_tokens_in', 0), dt.get('sonnet_tokens_out', 0), dt.get('sonnet_cache_read', 0))
+                + get_model_cost("haiku", dt.get('haiku_tokens_in', 0), dt.get('haiku_tokens_out', 0), dt.get('haiku_cache_read', 0))
+            )
         )
 
     log("  ✅ SQLite daily_stats synced (with token data)")

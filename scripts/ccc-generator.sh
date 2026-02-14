@@ -245,7 +245,7 @@ echo "  ⚙️ Loading co-evolution data..."
 COEVO_CONFIG_FILE="$KERNEL_DIR/coevo-config.json"
 
 echo "  💰 Loading subscription value from SQLite..."
-SUBSCRIPTION_DATA=$(python3 "$CCC_SQL" subscription 2>/dev/null || echo '{"rate":200,"totalValue":0,"multiplier":0}')
+SUBSCRIPTION_DATA=$(python3 "$CCC_SQL" subscription 2>/dev/null || echo '{"rate":200,"ratePeriod":"monthly","totalValue":0,"multiplier":0}')
 
 echo "  📦 Loading pack metrics..."
 # Generate fresh pack metrics from context-packs infrastructure
@@ -1944,7 +1944,7 @@ activity = safe_parse('''$ACTIVITY_DATA''', [])
 projects = safe_parse('''$PROJECTS_DATA''', [])
 proactive = safe_parse('''$PROACTIVE_DATA''', {"hasContext":False,"suggestions":[]})
 coevo_config = safe_parse('''$COEVO_CONFIG''', {"enabled":True,"autoApply":False,"minConfidence":0.7})
-subscription = safe_parse('''$SUBSCRIPTION_DATA''', {"rate":200,"totalValue":0,"multiplier":0})
+subscription = safe_parse('''$SUBSCRIPTION_DATA''', {"rate":200,"ratePeriod":"monthly","totalValue":0,"multiplier":0})
 
 # Load patterns from temp file
 with open('$PATTERNS_TMP', 'r') as f:
@@ -2043,15 +2043,19 @@ if pt_file.exists():
 else:
     pattern_trends['dailyList'] = []
 
-# Build subscription data for dashboard (now flat from ccc-sql-data.py)
+# Build subscription data for dashboard (token-level pricing from ccc-sql-data.py)
 subscription_data = {
     "rate": subscription.get('rate', 200),
+    "ratePeriod": subscription.get('ratePeriod', 'monthly'),
     "currency": subscription.get('currency', 'USD'),
     "totalValue": subscription.get('totalValue', 0),
     "multiplier": subscription.get('multiplier', 0),
     "savings": subscription.get('savings', 0),
+    "totalSubscriptionPaid": subscription.get('totalSubscriptionPaid', 0),
+    "monthsActive": subscription.get('monthsActive', 0),
     "utilization": subscription.get('utilization', 'unknown'),
-    "costPerMsg": subscription.get('costPerMsg', 0)
+    "costPerMsg": subscription.get('costPerMsg', 0),
+    "breakdown": subscription.get('breakdown', {})
 }
 
 # Inject data - read Observatory from temp file to avoid escaping issues

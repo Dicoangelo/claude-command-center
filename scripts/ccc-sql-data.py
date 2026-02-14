@@ -22,7 +22,7 @@ from pathlib import Path
 from collections import Counter, defaultdict
 
 sys.path.insert(0, str(Path.home() / ".claude/config"))
-from pricing import ESTIMATES as COSTS_PER_MSG
+from pricing import ESTIMATES as COSTS_PER_MSG, PRICING, MONTHLY_RATE_USD, get_model_cost
 
 DB_PATH = Path.home() / ".claude/data/claude.db"
 HOME = Path.home()
@@ -93,12 +93,15 @@ def get_stats_data():
         ORDER BY date ASC
     """).fetchall()
 
-    # Daily model tokens
+    # Daily model tokens (totals + per-model breakdown for accurate cost calculation)
     daily_tokens = conn.execute("""
         SELECT date,
             opus_tokens_in + opus_tokens_out + opus_cache_read as opus_total,
             sonnet_tokens_in + sonnet_tokens_out + sonnet_cache_read as sonnet_total,
-            haiku_tokens_in + haiku_tokens_out + haiku_cache_read as haiku_total
+            haiku_tokens_in + haiku_tokens_out + haiku_cache_read as haiku_total,
+            opus_tokens_in, opus_tokens_out, opus_cache_read,
+            sonnet_tokens_in, sonnet_tokens_out, sonnet_cache_read,
+            haiku_tokens_in, haiku_tokens_out, haiku_cache_read
         FROM daily_stats
         ORDER BY date ASC
     """).fetchall()
@@ -147,6 +150,16 @@ def get_stats_data():
                 "opus": r['opus_total'] or 0,
                 "sonnet": r['sonnet_total'] or 0,
                 "haiku": r['haiku_total'] or 0,
+            }, "tokenDetail": {
+                "opus_in": r['opus_tokens_in'] or 0,
+                "opus_out": r['opus_tokens_out'] or 0,
+                "opus_cache": r['opus_cache_read'] or 0,
+                "sonnet_in": r['sonnet_tokens_in'] or 0,
+                "sonnet_out": r['sonnet_tokens_out'] or 0,
+                "sonnet_cache": r['sonnet_cache_read'] or 0,
+                "haiku_in": r['haiku_tokens_in'] or 0,
+                "haiku_out": r['haiku_tokens_out'] or 0,
+                "haiku_cache": r['haiku_cache_read'] or 0,
             }}
             for r in daily_tokens
         ],
@@ -159,25 +172,55 @@ def get_stats_data():
 
 
 def get_subscription_data():
-    """Generate __SUBSCRIPTION_DATA__ from SQLite (replaces subscription-data.json)."""
+    """Generate __SUBSCRIPTION_DATA__ from SQLite using real token-level API pricing."""
     conn = get_db()
 
-    row = conn.execute("SELECT * FROM v_subscription_summary").fetchone()
+    # Get actual token totals
+    row = conn.execute("""
+        SELECT
+            SUM(opus_tokens_in) as opus_in, SUM(opus_tokens_out) as opus_out, SUM(opus_cache_read) as opus_cache,
+            SUM(sonnet_tokens_in) as sonnet_in, SUM(sonnet_tokens_out) as sonnet_out, SUM(sonnet_cache_read) as sonnet_cache,
+            SUM(haiku_tokens_in) as haiku_in, SUM(haiku_tokens_out) as haiku_out, SUM(haiku_cache_read) as haiku_cache,
+            SUM(opus_messages) + SUM(sonnet_messages) + SUM(haiku_messages) as total_messages,
+            SUM(session_count) as total_sessions,
+            MIN(date) as first_date
+        FROM daily_stats
+    """).fetchone()
+
     total_messages = row['total_messages'] or 0
     total_sessions = row['total_sessions'] or 0
-    total_value = row['total_value'] or 0
-    roi = row['roi_multiplier'] or 0
+
+    # Calculate real API cost using token-level pricing
+    opus_cost = get_model_cost("opus", row['opus_in'] or 0, row['opus_out'] or 0, row['opus_cache'] or 0)
+    sonnet_cost = get_model_cost("sonnet", row['sonnet_in'] or 0, row['sonnet_out'] or 0, row['sonnet_cache'] or 0)
+    haiku_cost = get_model_cost("haiku", row['haiku_in'] or 0, row['haiku_out'] or 0, row['haiku_cache'] or 0)
+    total_value = opus_cost + sonnet_cost + haiku_cost
+
+    # Calculate months active for subscription comparison
+    first_date = row['first_date'] or datetime.now().strftime('%Y-%m-%d')
+    days_active = (datetime.now() - datetime.strptime(first_date, '%Y-%m-%d')).days or 1
+    months_active = max(days_active / 30, 1)
+    total_subscription_paid = months_active * MONTHLY_RATE_USD
+    roi = round(total_value / total_subscription_paid, 1) if total_subscription_paid > 0 else 0
 
     conn.close()
 
     return {
-        "rate": 200,
+        "rate": MONTHLY_RATE_USD,
+        "ratePeriod": "monthly",
         "currency": "USD",
         "totalValue": round(total_value, 2),
         "multiplier": roi,
-        "savings": round(total_value - (total_sessions * 200 / 30), 2),  # rough
+        "savings": round(total_value - total_subscription_paid, 2),
+        "totalSubscriptionPaid": round(total_subscription_paid, 2),
+        "monthsActive": round(months_active, 1),
         "utilization": "high" if total_messages > 100 else "normal",
         "costPerMsg": round(total_value / max(total_messages, 1), 4),
+        "breakdown": {
+            "opus": round(opus_cost, 2),
+            "sonnet": round(sonnet_cost, 2),
+            "haiku": round(haiku_cost, 2)
+        }
     }
 
 
@@ -613,7 +656,7 @@ def main():
         sys.stderr.write(f"ccc-sql-data error: {e}\n")
         defaults = {
             'stats': '{"totalSessions":0,"totalMessages":0,"dailyActivity":[],"dailyModelTokens":[],"modelUsage":{},"hourCounts":{}}',
-            'subscription': '{"rate":200,"totalValue":0,"multiplier":0}',
+            'subscription': '{"rate":200,"ratePeriod":"monthly","totalValue":0,"multiplier":0}',
             'outcomes': '{"sessions":[],"totals":{"total":0,"success":0,"abandoned":0,"partial":0,"error":0,"other":0,"avgMessages":0,"totalMessages":0,"totalTools":0,"empty":0,"marathon":0},"qualityDist":{},"modelOutcomes":{},"sizeDist":{},"daily":[]}',
             'routing': '{"totalQueries":0,"dataQuality":0.0,"feedbackCount":0}',
             'recovery': '{"stats":{"total":0},"categories":{},"outcomes":[],"timeline":[],"successByCategory":{},"matrix":[]}',
