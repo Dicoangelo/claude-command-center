@@ -119,7 +119,7 @@
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                │
-│   2,889        258.2K        89.8K       $13.9K       99.8%       15          │
+│   2,879        258K          89.9K       $5.5K        99.8%       15          │
 │   SESSIONS     MESSAGES      TOOL CALLS  API VALUE    CACHE HIT   TABS        │
 │                                                                                │
 │   ══════════════════════════════════════════════════════════════════════════   │
@@ -240,10 +240,10 @@ flowchart TB
 <h3>💰 Cost Analytics</h3>
 <b>ROI Tracking</b>
 <br/><br/>
-<p>API value vs subscription, per-model cost breakdown, cache efficiency (99.8%), daily cost trends, savings calculator.</p>
+<p>API value vs $200/mo subscription, per-model token-level cost breakdown, cache efficiency (99.8%), daily cost trends, ROI calculator.</p>
 <br/>
 
-`$13.9K Value` `1.8x ROI` `$120K Saved`
+`$5.5K Value` `21.3x ROI` `$5.3K Saved`
 
 <br/>
 <img src="https://img.shields.io/badge/Cache_Hit-99.8%25-00ff88?style=for-the-badge&labelColor=0d1117"/>
@@ -294,13 +294,13 @@ flowchart TB
 <h3>🔧 Tool Analytics</h3>
 <b>Usage Intelligence</b>
 <br/><br/>
-<p>101K total tool calls, 20 unique tools, success rates, daily averages, top tool breakdown (Bash: 38.8K).</p>
+<p>89.9K total tool calls, 20 unique tools, success rates, daily averages, top tool breakdown.</p>
 <br/>
 
-`101K Calls` `100% Success` `20 Tools`
+`89.9K Calls` `100% Success` `20 Tools`
 
 <br/>
-<img src="https://img.shields.io/badge/Top_Tool-Bash_38.8K-00ff88?style=for-the-badge&labelColor=0d1117"/>
+<img src="https://img.shields.io/badge/Top_Tool-Bash-00ff88?style=for-the-badge&labelColor=0d1117"/>
 </td>
 </tr>
 </table>
@@ -312,10 +312,10 @@ flowchart TB
 
 | # | Tab | Key Metrics | Visual |
 |:-:|:----|:------------|:------:|
-| 1 | **Overview** | 2.9K sessions, 258K messages, 89.8K tools | Charts + Cards |
+| 1 | **Overview** | 2.9K sessions, 258K messages, 89.9K tools | Charts + Cards |
 | 2 | **Memory** | 88 knowledge items, 98 unique tags | Donut + Bars |
 | 3 | **Activity** | Daily messages, session heatmap | Time Series |
-| 4 | **Cost** | $13.9K value, 99.8% cache, $120K saved | Stacked + Gauge |
+| 4 | **Cost** | $5.5K API value, 21.3x ROI, $200/mo sub | Stacked + Gauge |
 | 5 | **Projects** | 19 repos, 10.6K commits, 3.9M LOC | Table + Stats |
 | 6 | **Commands** | 65 commands, 10 categories | Frequency |
 | 7 | **Routing** | 1.2K queries, DQ 0.665, 52.5% savings | Distribution |
@@ -323,7 +323,7 @@ flowchart TB
 | 9 | **Context Packs** | 8 packs, 3.7K tokens | Pack Cards |
 | 10 | **Session Outcomes** | 2.8K analyzed, 55.6% success | Pie + Trends |
 | 11 | **Productivity** | 38.5% score, 17.3K writes, 27.6K reads | Bar + Line |
-| 12 | **Tool Analytics** | 101K calls, 20 tools, 100% success | Bar + Table |
+| 12 | **Tool Analytics** | 89.9K calls, 20 tools, 100% success | Bar + Table |
 | 13 | **Supermemory** | 5K items, 871 learnings, 152 reviews due | Spaced Rep |
 | 14 | **Cognitive** | Flow state, fate prediction, energy map | Line + Heatmap |
 | 15 | **Infrastructure** | 8/8 daemons, 1.2K heals, 89% recovery | Status Grid |
@@ -587,7 +587,7 @@ curl http://localhost:8766/api/health
 ║                                                                              ║
 ║   THE COMMAND CENTER EXISTS BECAUSE:                                          ║
 ║                                                                              ║
-║   ▸ 2,889 sessions generate data that deserves visibility                  ║
+║   ▸ 2,879 sessions generate data that deserves visibility                  ║
 ║   ▸ Self-healing means never waking up to a broken system                  ║
 ║   ▸ Real-time streaming replaces manual dashboard refreshes                ║
 ║   ▸ Every token, every tool call, every session — tracked                  ║
@@ -618,6 +618,7 @@ curl http://localhost:8766/api/health
 
 | Date | Action | Outcome |
 |------|--------|---------|
+| 2026-02-13 | Cost model overhaul | Token-level pricing ($200/mo sub), symlink consolidation, README accuracy |
 | 2026-02-12 | Live SSE streaming | Real-time dashboard with 3s updates, LIVE indicator |
 | 2026-02-12 | Token pipeline fix | Backfilled daily_stats from sessions table (79 rows) |
 | 2026-02-12 | Recovery data fix | Mapped SQLite Row objects to proper JS format |
