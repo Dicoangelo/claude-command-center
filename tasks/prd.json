@@ -1,0 +1,319 @@
+{
+  "name": "Claude Command Center — Engineering Hardening",
+  "description": "Harden the Claude Command Center with test coverage, CI/CD, developer experience, type safety, and operational automation. Zero tests → full test suite. No CI → GitHub Actions. No docs → complete setup guide. No types → full type hints.",
+  "branchName": "ralph/ccc-hardening",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Python Project Scaffolding (pyproject.toml + requirements)",
+      "description": "As a developer, I want proper Python packaging so that dependencies are explicit and the project is reproducible.",
+      "acceptanceCriteria": [
+        "Create pyproject.toml with project metadata (name=claude-command-center, version read from scripts)",
+        "List all Python dependencies: sqlite3 (stdlib), http.server (stdlib), json (stdlib), pathlib (stdlib) — note which are stdlib",
+        "Create requirements.txt with any non-stdlib deps (if any external deps found in imports)",
+        "Create requirements-dev.txt with: pytest, pytest-cov, mypy, ruff, httpx (for API testing)",
+        "Add [tool.ruff] config to pyproject.toml: line-length=120, target-version='py312'",
+        "Add [tool.mypy] config: python_version='3.12', warn_return_any=true",
+        "Add [tool.pytest.ini_options]: testpaths=['tests'], python_files='test_*.py'",
+        "python3 -m pytest --co (collect only) runs without import errors",
+        "ruff check scripts/ passes or lists only pre-existing issues"
+      ],
+      "priority": 1,
+      "notes": "Foundation story. Scan all .py files for imports to build accurate dependency list. The project uses stdlib heavily but may have external deps in some scripts.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "SQLite Schema Documentation",
+      "description": "As a developer, I want a committed schema.sql so that the database structure is documented and reproducible.",
+      "acceptanceCriteria": [
+        "Create config/schema.sql by inspecting ~/.claude/data/claude.db with sqlite3 .schema",
+        "Include all CREATE TABLE statements with column types and constraints",
+        "Include all CREATE INDEX statements",
+        "Add header comments documenting each table's purpose",
+        "Add WAL mode pragma as first statement",
+        "The file can be run against an empty database to recreate the schema: sqlite3 test.db < config/schema.sql succeeds",
+        "Delete the test database after verification"
+      ],
+      "priority": 1,
+      "notes": "Query the actual database to get the real schema. Don't invent columns — use what exists.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "Test Suite: API Server Endpoints",
+      "description": "As a developer, I want pytest tests for all 12 REST endpoints so that API behavior is verified automatically.",
+      "acceptanceCriteria": [
+        "Create tests/ directory with __init__.py and conftest.py",
+        "conftest.py: fixture that creates a temporary SQLite database with test data",
+        "conftest.py: fixture that starts the API server on a random available port",
+        "Create tests/test_api_endpoints.py",
+        "Test GET /api/stats returns valid JSON with expected keys (sessions, messages, tools, tokens)",
+        "Test GET /api/cost returns valid JSON with totalValue, multiplier, breakdown keys",
+        "Test GET /api/memory returns valid JSON",
+        "Test GET /api/activity returns valid JSON with daily activity data",
+        "Test GET /api/routing returns valid JSON with routing decisions",
+        "Test GET /api/outcomes returns valid JSON",
+        "Test GET /api/recovery returns valid JSON",
+        "Test GET /api/infrastructure returns valid JSON",
+        "Test that all endpoints return 200 status code",
+        "Test that SSE endpoint /api/stream returns text/event-stream content type",
+        "Test that unknown endpoints return 404",
+        "All tests pass: python3 -m pytest tests/test_api_endpoints.py -v"
+      ],
+      "priority": 1,
+      "notes": "The API server is in scripts/ccc-api-server.py. It uses Python's built-in http.server. May need to refactor server slightly to make it testable (extract handler class). Use httpx for HTTP testing. Create a small test fixture database with realistic but minimal data.",
+      "dependsOn": ["US-001"]
+    },
+    {
+      "id": "US-004",
+      "title": "Test Suite: SQL Data Exporter",
+      "description": "As a developer, I want pytest tests for ccc-sql-data.py so that data export logic is verified.",
+      "acceptanceCriteria": [
+        "Create tests/test_sql_data.py",
+        "Test stats subcommand outputs valid JSON with correct aggregations",
+        "Test subscription subcommand outputs valid JSON with multiplier calculation",
+        "Test outcomes subcommand outputs valid JSON with success/failure counts",
+        "Test routing subcommand outputs valid JSON with DQ scores",
+        "Test recovery subcommand outputs valid JSON with recovery outcomes",
+        "Test 'all' subcommand outputs all data combined",
+        "Test with empty database returns sensible defaults (not errors)",
+        "Test cost calculation matches expected values for known token counts",
+        "Use conftest.py fixtures from US-003 for test database",
+        "All tests pass: python3 -m pytest tests/test_sql_data.py -v"
+      ],
+      "priority": 1,
+      "notes": "ccc-sql-data.py is in scripts/. It reads from SQLite and outputs JSON. Test the core functions, not the CLI wrapper.",
+      "dependsOn": ["US-001", "US-003"]
+    },
+    {
+      "id": "US-005",
+      "title": "Test Suite: Self-Heal Engine",
+      "description": "As a developer, I want pytest tests for ccc-self-heal.py so that error detection and fix logic is verified.",
+      "acceptanceCriteria": [
+        "Create tests/test_self_heal.py",
+        "Test each of the 8 error patterns is correctly detected",
+        "Test auto-fix patterns actually apply fixes (git username, stale locks, safe paths, cache, corrupt state)",
+        "Test suggest-only patterns return suggestions without modifying state",
+        "Test recovery rate calculation is correct",
+        "Test with no errors present returns clean status",
+        "Mock filesystem and git operations — don't touch real git config",
+        "All tests pass: python3 -m pytest tests/test_self_heal.py -v"
+      ],
+      "priority": 2,
+      "notes": "ccc-self-heal.py has 8 error patterns. Use unittest.mock to mock filesystem ops, subprocess calls, and git commands. Focus on detection logic, not side effects.",
+      "dependsOn": ["US-001"]
+    },
+    {
+      "id": "US-006",
+      "title": "Test Suite: Datastore ORM",
+      "description": "As a developer, I want pytest tests for config/datastore.py so that the ORM layer is verified.",
+      "acceptanceCriteria": [
+        "Create tests/test_datastore.py",
+        "Test database connection and WAL mode activation",
+        "Test table creation (ensure_tables or equivalent)",
+        "Test CRUD operations for each table method",
+        "Test upsert behavior (ON CONFLICT handling)",
+        "Test concurrent read/write doesn't deadlock (WAL mode)",
+        "Test with empty database returns empty results, not errors",
+        "All tests pass: python3 -m pytest tests/test_datastore.py -v"
+      ],
+      "priority": 2,
+      "notes": "config/datastore.py is 359 lines. Uses SQLite with WAL mode. Test against a temporary in-memory or temp-file database.",
+      "dependsOn": ["US-001"]
+    },
+    {
+      "id": "US-007",
+      "title": "Makefile for Common Tasks",
+      "description": "As a developer, I want a Makefile so that common operations are one command away.",
+      "acceptanceCriteria": [
+        "Create Makefile in project root",
+        "Target 'test': runs python3 -m pytest tests/ -v --tb=short",
+        "Target 'test-cov': runs pytest with --cov=scripts --cov-report=term-missing",
+        "Target 'lint': runs ruff check scripts/ config/",
+        "Target 'format': runs ruff format scripts/ config/",
+        "Target 'typecheck': runs mypy scripts/ config/ --ignore-missing-imports",
+        "Target 'generate': runs bash scripts/ccc-generator.sh",
+        "Target 'serve': starts the API server (python3 scripts/ccc-api-server.py)",
+        "Target 'backup': copies ~/.claude/data/claude.db to backups/ with timestamp",
+        "Target 'fix-data': runs python3 scripts/fix-all-dashboard-data.py",
+        "Target 'all': runs lint format typecheck test",
+        "Target 'help': prints all available targets with descriptions",
+        "make help works and shows all targets",
+        "make test works (even if some tests fail, the target itself should execute)"
+      ],
+      "priority": 1,
+      "notes": "Keep it simple. Use .PHONY for all targets. Add brief comments above each target.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-008",
+      "title": "GitHub Actions CI Workflow",
+      "description": "As a developer, I want automated CI so that every push runs lint and tests.",
+      "acceptanceCriteria": [
+        "Create .github/workflows/ci.yml",
+        "Trigger on push to main and pull requests",
+        "Use Python 3.12",
+        "Install dev dependencies from requirements-dev.txt",
+        "Step 1: ruff check scripts/ config/",
+        "Step 2: ruff format --check scripts/ config/",
+        "Step 3: mypy scripts/ config/ --ignore-missing-imports (allow-failure initially)",
+        "Step 4: python3 -m pytest tests/ -v --tb=short",
+        "Add status badge to README.md (ci passing/failing)",
+        "Workflow file is valid YAML (python3 -c \"import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))\" or equivalent validation)"
+      ],
+      "priority": 1,
+      "notes": "Keep the workflow simple. Single job, single runner (ubuntu-latest). The project uses SQLite which is available everywhere. Don't add Docker or complex matrix builds.",
+      "dependsOn": ["US-001", "US-007"]
+    },
+    {
+      "id": "US-009",
+      "title": "Type Hints: ccc-api-server.py",
+      "description": "As a developer, I want full type annotations on the API server so that mypy catches bugs.",
+      "acceptanceCriteria": [
+        "Add type hints to ALL function signatures in scripts/ccc-api-server.py",
+        "Add type hints to ALL class methods (including __init__, do_GET, etc.)",
+        "Add type hints to module-level variables where types aren't obvious",
+        "Use typing module for complex types (Dict, List, Optional, Any, Tuple)",
+        "Add return type annotations to all functions",
+        "mypy scripts/ccc-api-server.py --ignore-missing-imports shows zero errors or only pre-existing structural issues",
+        "The server still starts and serves correctly after changes",
+        "No functional behavior changes — types only"
+      ],
+      "priority": 2,
+      "notes": "DO NOT change any logic. Only add type annotations. The file is ~731 lines. Be thorough but don't break anything. Test by running the server after changes.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-010",
+      "title": "Type Hints: ccc-sql-data.py",
+      "description": "As a developer, I want full type annotations on the SQL data exporter.",
+      "acceptanceCriteria": [
+        "Add type hints to ALL function signatures in scripts/ccc-sql-data.py",
+        "Add type hints to ALL class methods",
+        "Add return type annotations to all functions",
+        "Use TypedDict for structured dictionary returns where appropriate",
+        "mypy scripts/ccc-sql-data.py --ignore-missing-imports shows zero or minimal errors",
+        "The script still works correctly: python3 scripts/ccc-sql-data.py stats produces valid JSON",
+        "No functional behavior changes — types only"
+      ],
+      "priority": 2,
+      "notes": "668 lines. Focus on function signatures and return types. Don't refactor logic.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-011",
+      "title": "Type Hints: fix-all-dashboard-data.py",
+      "description": "As a developer, I want full type annotations on the dashboard data fixer.",
+      "acceptanceCriteria": [
+        "Add type hints to ALL function signatures in scripts/fix-all-dashboard-data.py",
+        "Add return type annotations to all functions",
+        "Use TypedDict for structured dictionary returns where appropriate",
+        "mypy scripts/fix-all-dashboard-data.py --ignore-missing-imports shows zero or minimal errors",
+        "The script still works correctly: python3 scripts/fix-all-dashboard-data.py runs without errors",
+        "No functional behavior changes — types only"
+      ],
+      "priority": 3,
+      "notes": "767 lines. This script has complex nested logic. Focus on function signatures, not inline variable types.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-012",
+      "title": "Type Hints: ccc-self-heal.py",
+      "description": "As a developer, I want full type annotations on the self-heal engine.",
+      "acceptanceCriteria": [
+        "Add type hints to ALL function signatures in scripts/ccc-self-heal.py",
+        "Add return type annotations to all functions",
+        "Use TypedDict or dataclass for error pattern definitions if appropriate",
+        "mypy scripts/ccc-self-heal.py --ignore-missing-imports shows zero or minimal errors",
+        "The script still works correctly after changes",
+        "No functional behavior changes — types only"
+      ],
+      "priority": 3,
+      "notes": "1,104 lines. Largest script. Focus on public API and function signatures.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-013",
+      "title": "Database Backup Automation Script",
+      "description": "As an operator, I want automated database backups so that data is protected against corruption.",
+      "acceptanceCriteria": [
+        "Create scripts/ccc-backup.py",
+        "Default backup location: ~/.claude/backups/",
+        "Filename format: claude-db-YYYY-MM-DD-HHMMSS.db",
+        "Use SQLite backup API (connection.backup()) for consistent snapshots",
+        "Retain last 7 daily backups, delete older ones",
+        "Support --keep N flag to override retention count",
+        "Support --dest flag to override backup directory",
+        "Print backup size and path on success",
+        "Exit code 0 on success, 1 on failure",
+        "Add 'backup' target to Makefile that calls this script",
+        "Test: python3 scripts/ccc-backup.py --dest /tmp/test-backup works"
+      ],
+      "priority": 2,
+      "notes": "Use Python's sqlite3 backup API. Don't just copy the file — use proper backup for WAL consistency. Keep it simple: ~50-100 lines.",
+      "dependsOn": ["US-007"]
+    },
+    {
+      "id": "US-014",
+      "title": "Setup Documentation in README",
+      "description": "As a new developer, I want a complete setup guide so that I can run the dashboard from a fresh clone.",
+      "acceptanceCriteria": [
+        "Add '## Setup' section to README.md after the overview section",
+        "Document prerequisites: Python 3.12+, macOS (for LaunchAgent), SQLite 3",
+        "Step 1: Clone the repo",
+        "Step 2: Install dev dependencies (pip install -r requirements-dev.txt)",
+        "Step 3: Create symlinks (list the exact symlink commands from scripts/ to ~/.claude/scripts/)",
+        "Step 4: Initialize the database (reference schema.sql)",
+        "Step 5: Generate the dashboard (make generate)",
+        "Step 6: Start the server (make serve)",
+        "Step 7: Open http://localhost:8766/dashboard",
+        "Document the LaunchAgent setup for always-on mode",
+        "Add a 'Quick Start' one-liner if possible",
+        "Keep the existing README content — add to it, don't replace"
+      ],
+      "priority": 2,
+      "notes": "Read the existing README carefully before modifying. Add the setup section in a logical place (after overview, before architecture). Don't break existing shields, badges, or visual elements.",
+      "dependsOn": ["US-001", "US-002", "US-007"]
+    },
+    {
+      "id": "US-015",
+      "title": "Troubleshooting Section in README",
+      "description": "As a developer, I want a troubleshooting guide so that common issues have documented solutions.",
+      "acceptanceCriteria": [
+        "Add '## Troubleshooting' section to README.md near the bottom",
+        "Document: 'Server won't start' — check port 8766, kill stale process",
+        "Document: 'Dashboard shows stale data' — run make fix-data then make generate",
+        "Document: 'SSE not connecting' — check CORS, server running, browser console",
+        "Document: 'ROI numbers look wrong' — verify pricing.py values match Anthropic pricing",
+        "Document: 'LaunchAgent not starting' — launchctl load/unload commands",
+        "Document: 'Database locked' — WAL mode, check for stale connections",
+        "Document: 'Screenshots outdated' — run screenshot-showcase skill",
+        "Use collapsible <details> sections for each issue",
+        "Keep concise — problem + solution format"
+      ],
+      "priority": 3,
+      "notes": "Add at the bottom of README, before any existing footer elements. Use HTML <details><summary> for collapsible sections.",
+      "dependsOn": ["US-014"]
+    },
+    {
+      "id": "US-016",
+      "title": "CHANGELOG.md with Version History",
+      "description": "As a developer, I want a changelog so that the project's evolution is tracked.",
+      "acceptanceCriteria": [
+        "Create CHANGELOG.md following Keep a Changelog format (keepachangelog.com)",
+        "Document version 1.0.0 based on the git log (initial commit through current state)",
+        "Categories: Added, Changed, Fixed for each version",
+        "v1.0.0: Initial release with 15-tab dashboard, SSE streaming, self-healing",
+        "v1.1.0: Cost model fix ($200/month), token-level pricing, visual overhaul",
+        "v1.2.0: ROI mismatch fix, live cost API, text overflow fixes, nav tab improvements",
+        "v1.3.0: (this PR) Test suite, CI/CD, type hints, developer tooling",
+        "Link each version to the corresponding git tag or commit range",
+        "Add 'Unreleased' section at top for ongoing work"
+      ],
+      "priority": 3,
+      "notes": "Read git log for accurate commit history. Use conventional versioning. Don't invent features — only document what actually exists.",
+      "dependsOn": []
+    }
+  ]
+}
