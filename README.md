@@ -11,7 +11,7 @@
 [![Status](https://img.shields.io/badge/Status-Live_SSE-00ff88?style=for-the-badge&labelColor=0d1117)](http://localhost:8766/dashboard)
 [![Python](https://img.shields.io/badge/Python-3.12+-00ff88?style=for-the-badge&logo=python&labelColor=0d1117)](https://python.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/Dicoangelo/claude-command-center/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=0d1117&color=00ff88)](https://github.com/Dicoangelo/claude-command-center/actions)
-[![Tests](https://img.shields.io/badge/Tests-42_passing-00ff88?style=for-the-badge&labelColor=0d1117)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-124_passing-00ff88?style=for-the-badge&labelColor=0d1117)](tests/)
 
 <br/>
 
