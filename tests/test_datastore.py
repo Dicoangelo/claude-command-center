@@ -8,25 +8,30 @@ from pathlib import Path
 import pytest
 
 # Add config to import path
-sys.path.insert(0, str(Path(__file__).parent.parent / "config"))
-from datastore import Datastore
+CONFIG_DIR = Path(__file__).parent.parent / "config"
+sys.path.insert(0, str(CONFIG_DIR))
+import datastore  # noqa: E402
+from datastore import Datastore  # noqa: E402
+
+REPO_SCHEMA = CONFIG_DIR / "schema.sql"
 
 
 class TestDatastoreInit:
     """Test database initialization and connection."""
 
-    def test_creates_database(self, tmp_path):
+    def test_creates_database(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(datastore, "SCHEMA_PATH", REPO_SCHEMA)
         db_path = tmp_path / "test.db"
         Datastore(db_path)
         assert db_path.exists()
 
-    def test_wal_mode(self, tmp_path):
+    def test_wal_mode(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(datastore, "SCHEMA_PATH", REPO_SCHEMA)
         db_path = tmp_path / "test.db"
         Datastore(db_path)
         conn = sqlite3.connect(str(db_path))
         mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
         conn.close()
-        # WAL or delete both acceptable (WAL requires schema.sql)
         assert mode in ("wal", "delete")
 
     def test_connect_context_manager(self, tmp_path):
@@ -208,7 +213,8 @@ class TestExport:
         assert "dailyActivity" in export
         assert isinstance(export["dailyActivity"], list)
 
-    def test_export_with_empty_db(self, tmp_path):
+    def test_export_with_empty_db(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(datastore, "SCHEMA_PATH", REPO_SCHEMA)
         ds = Datastore(tmp_path / "empty.db")
         export = ds.export_stats_cache()
         assert export["totalSessions"] == 0
