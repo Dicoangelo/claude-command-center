@@ -38,6 +38,14 @@ DB_PATH = CLAUDE_DIR / "data" / "claude.db"
 DASHBOARD_HTML = CLAUDE_DIR / "dashboard" / "claude-command-center.html"
 PORT = 8766
 
+# Import pricing config
+sys.path.insert(0, str(CLAUDE_DIR / "config"))
+try:
+    from pricing import get_model_cost, MONTHLY_RATE_USD
+except ImportError:
+    get_model_cost = lambda m, i, o, c=0: 0.0
+    MONTHLY_RATE_USD = 200
+
 # Import memory query engine
 sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
 try:
@@ -534,8 +542,59 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         self.send_json(data)
 
     def get_cost(self, params):
-        data = self.load_json(CLAUDE_DIR / "kernel/cost-data.json")
-        self.send_json(data)
+        """Compute cost data live from SQLite using token-level pricing."""
+        try:
+            conn = sqlite3.connect(str(DB_PATH), timeout=5)
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("""
+                SELECT
+                    SUM(opus_tokens_in) as opus_in, SUM(opus_tokens_out) as opus_out, SUM(opus_cache_read) as opus_cache,
+                    SUM(sonnet_tokens_in) as sonnet_in, SUM(sonnet_tokens_out) as sonnet_out, SUM(sonnet_cache_read) as sonnet_cache,
+                    SUM(haiku_tokens_in) as haiku_in, SUM(haiku_tokens_out) as haiku_out, SUM(haiku_cache_read) as haiku_cache,
+                    MIN(date) as first_date, COUNT(*) as days_active
+                FROM daily_stats
+            """).fetchone()
+            opus_cost = get_model_cost("opus", row['opus_in'] or 0, row['opus_out'] or 0, row['opus_cache'] or 0)
+            sonnet_cost = get_model_cost("sonnet", row['sonnet_in'] or 0, row['sonnet_out'] or 0, row['sonnet_cache'] or 0)
+            haiku_cost = get_model_cost("haiku", row['haiku_in'] or 0, row['haiku_out'] or 0, row['haiku_cache'] or 0)
+            total_value = opus_cost + sonnet_cost + haiku_cost
+            days = row['days_active'] or 1
+            months = max(days / 30.0, 1)
+            sub_paid = months * MONTHLY_RATE_USD
+            # Cache savings: what cache reads would cost at full input price
+            cache_total = (row['opus_cache'] or 0) + (row['sonnet_cache'] or 0) + (row['haiku_cache'] or 0)
+            input_total = (row['opus_in'] or 0) + (row['sonnet_in'] or 0) + (row['haiku_in'] or 0)
+            cache_eff = round(cache_total / max(cache_total + input_total, 1) * 100, 1)
+            # Daily cost breakdown (last 30 days)
+            daily_rows = conn.execute("""
+                SELECT date, opus_tokens_in, opus_tokens_out, opus_cache_read,
+                       sonnet_tokens_in, sonnet_tokens_out, sonnet_cache_read,
+                       haiku_tokens_in, haiku_tokens_out, haiku_cache_read
+                FROM daily_stats ORDER BY date DESC LIMIT 30
+            """).fetchall()
+            daily_costs = []
+            for d in daily_rows:
+                dc = (get_model_cost("opus", d['opus_tokens_in'] or 0, d['opus_tokens_out'] or 0, d['opus_cache_read'] or 0)
+                    + get_model_cost("sonnet", d['sonnet_tokens_in'] or 0, d['sonnet_tokens_out'] or 0, d['sonnet_cache_read'] or 0)
+                    + get_model_cost("haiku", d['haiku_tokens_in'] or 0, d['haiku_tokens_out'] or 0, d['haiku_cache_read'] or 0))
+                daily_costs.append({"date": d['date'], "cost": round(dc, 2)})
+            conn.close()
+            self.send_json({
+                "today": daily_costs[0]['cost'] if daily_costs else 0,
+                "thisWeek": round(sum(d['cost'] for d in daily_costs[:7]), 2),
+                "thisMonth": round(sum(d['cost'] for d in daily_costs[:30]), 2),
+                "savedViaCache": round(total_value - sub_paid, 2) if total_value > sub_paid else 0,
+                "cacheEfficiency": cache_eff,
+                "dailyCosts": daily_costs,
+                "totalValue": round(total_value, 2),
+                "totalSubscriptionPaid": round(sub_paid, 2),
+                "multiplier": round(total_value / sub_paid, 1) if sub_paid > 0 else 0,
+                "rate": MONTHLY_RATE_USD,
+                "ratePeriod": "monthly",
+                "breakdown": {"opus": round(opus_cost, 2), "sonnet": round(sonnet_cost, 2), "haiku": round(haiku_cost, 2)}
+            })
+        except Exception as e:
+            self.send_json({"error": str(e), "today": 0, "thisWeek": 0, "thisMonth": 0, "dailyCosts": []})
 
     def get_routing(self, params):
         limit = int(params.get('limit', [100])[0])

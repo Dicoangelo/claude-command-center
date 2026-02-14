@@ -124,6 +124,12 @@
       display: none;
     }
 
+    .nav-tabs {
+      mask-image: linear-gradient(to right, transparent 0%, black 2%, black 96%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, black 2%, black 96%, transparent 100%);
+      padding: 0 0.5rem;
+    }
+
     .nav-tab {
       padding: 1rem 0.75rem;
       cursor: pointer;
@@ -402,7 +408,7 @@
 
     .stat-card .stat-value,
     .stat-card .value {
-      font-size: 2.1rem;
+      font-size: clamp(1.4rem, 2.5vw, 2.1rem);
       font-weight: 700;
       background: var(--gradient-primary);
       -webkit-background-clip: text;
@@ -411,6 +417,9 @@
       line-height: 1.1;
       font-family: 'JetBrains Mono', monospace;
       filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.15));
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .stat-card .stat-label,
@@ -707,7 +716,7 @@
     }
 
     .cost-card .amount {
-      font-size: 2.75rem;
+      font-size: clamp(1.6rem, 3vw, 2.75rem);
       font-weight: 700;
       font-family: 'JetBrains Mono', monospace;
       background: var(--gradient-primary);
@@ -715,6 +724,9 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
       filter: drop-shadow(0 0 12px rgba(0, 217, 255, 0.2));
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .cost-card.savings .amount {
@@ -1744,14 +1756,14 @@
       <button class="nav-tab" data-tab="projects">Projects</button>
       <button class="nav-tab" data-tab="commands">Commands</button>
       <button class="nav-tab" data-tab="routing">Routing</button>
-      <button class="nav-tab" data-tab="coevo">Co-Evolution</button>
-      <button class="nav-tab" data-tab="context-efficiency">Context Packs</button>
-      <button class="nav-tab" data-tab="session-outcomes">Session Outcomes</button>
+      <button class="nav-tab" data-tab="coevo">Co-Evo</button>
+      <button class="nav-tab" data-tab="context-efficiency">Packs</button>
+      <button class="nav-tab" data-tab="session-outcomes">Outcomes</button>
       <button class="nav-tab" data-tab="productivity">Productivity</button>
-      <button class="nav-tab" data-tab="tool-analytics">Tool Analytics</button>
-      <button class="nav-tab" data-tab="supermemory">Supermemory</button>
+      <button class="nav-tab" data-tab="tool-analytics">Tools</button>
+      <button class="nav-tab" data-tab="supermemory">Supermem</button>
       <button class="nav-tab" data-tab="cognitive">Cognitive</button>
-      <button class="nav-tab" data-tab="infrastructure">Infrastructure</button>
+      <button class="nav-tab" data-tab="infrastructure">Infra</button>
     </div>
     <div class="nav-actions">
       <button class="nav-btn" onclick="location.reload()">Refresh</button>
@@ -4760,11 +4772,12 @@
       const allInputTokens = Object.values(mu).reduce((s, m) => s + (m.inputTokens || 0), 0);
       const allOutputTokens = Object.values(mu).reduce((s, m) => s + (m.outputTokens || 0), 0);
 
-      // Per-model API pricing (per million tokens)
+      // Per-model API pricing from pricing.json (per million tokens)
+      const _pr = typeof PRICING_DATA !== 'undefined' ? PRICING_DATA.models || {} : {};
       const pricing = {
-        opus: { input: 15, output: 75, cacheRead: 1.50 },
-        sonnet: { input: 3, output: 15, cacheRead: 0.30 },
-        haiku: { input: 0.80, output: 4, cacheRead: 0.08 }
+        opus: { input: _pr.opus?.input || 5, output: _pr.opus?.output || 25, cacheRead: _pr.opus?.cache_read || 0.50 },
+        sonnet: { input: _pr.sonnet?.input || 3, output: _pr.sonnet?.output || 15, cacheRead: _pr.sonnet?.cache_read || 0.30 },
+        haiku: { input: _pr.haiku?.input || 1, output: _pr.haiku?.output || 5, cacheRead: _pr.haiku?.cache_read || 0.10 }
       };
 
       // Calculate per-model costs (API value = what you'd pay at API rates)

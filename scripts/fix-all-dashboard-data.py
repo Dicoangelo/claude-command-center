@@ -584,25 +584,42 @@ for session in all_sessions:
         daily_cost_data[date]["sonnet"] += models.get('sonnet', 0)
         daily_cost_data[date]["haiku"] += models.get('haiku', 0)
 
-# Build daily_trend with cost calculations
+# Build daily_trend using real token-level cost_estimate from SQLite daily_stats
 daily_trend = []
-for date in sorted(daily_cost_data.keys()):  # All time
+# Query real cost_estimate per date from SQLite (computed with get_model_cost in previous runs)
+import sqlite3 as _sq15
+_db15_path = CLAUDE_DIR / "data" / "claude.db"
+_db15_costs = {}
+if _db15_path.exists():
+    try:
+        _c15 = _sq15.connect(str(_db15_path), timeout=5.0)
+        _c15.row_factory = _sq15.Row
+        for _r15 in _c15.execute("SELECT date, cost_estimate FROM daily_stats WHERE cost_estimate > 0").fetchall():
+            _db15_costs[_r15['date']] = _r15['cost_estimate']
+        _c15.close()
+    except Exception:
+        pass
+
+for date in sorted(daily_cost_data.keys()):
     d = daily_cost_data[date]
-    daily_cost = (d["opus"] * COSTS_PER_MSG["opus"]) + (d["sonnet"] * COSTS_PER_MSG["sonnet"]) + (d["haiku"] * COSTS_PER_MSG["haiku"])
+    # Prefer real token-level cost from SQLite, fall back to per-message estimate
+    real_cost = _db15_costs.get(date, 0)
+    if real_cost == 0 and d["messages"] > 0:
+        real_cost = (d["opus"] * COSTS_PER_MSG["opus"]) + (d["sonnet"] * COSTS_PER_MSG["sonnet"]) + (d["haiku"] * COSTS_PER_MSG["haiku"])
     daily_trend.append({
         "date": date,
         "sessions": d["sessions"],
         "messages": d["messages"],
-        "token_savings": int(d["messages"] * 1500),  # Approximate tokens
-        "cost_savings": round(daily_cost, 2)
+        "token_savings": int(d["messages"] * 1500),
+        "cost_savings": round(real_cost, 2)
     })
 
 # Update pack_metrics with the new daily_trend
 pack_metrics["daily_trend"] = daily_trend
 pack_metrics["global"] = pack_metrics.get("global", {})
-# total_sessions here is system-wide; preserve pack-specific recent_sessions separately
 pack_metrics["global"]["system_sessions"] = total_sessions
-pack_metrics["global"]["total_cost_savings"] = round(total_value, 2)
+# Total cost savings from real token-level pricing
+pack_metrics["global"]["total_cost_savings"] = round(sum(d["cost_savings"] for d in daily_trend), 2)
 # Compute real cache_hit_rate from token data
 total_input = (real_tokens["cache_read"] + real_tokens["input"] + real_tokens["cache_create"]) or 1
 pack_metrics["global"]["cache_hit_rate"] = round(real_tokens["cache_read"] / total_input, 4)
