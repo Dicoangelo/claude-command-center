@@ -22,6 +22,7 @@ Run: python3 ccc-api-server.py [--port 8766]
 """
 
 import hashlib
+import importlib.util
 import json
 import sqlite3
 import sys
@@ -563,7 +564,17 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
     # ─── REST Endpoints (unchanged) ──────────────────────────
 
     def get_stats(self, params: Dict[str, List[str]]) -> None:
-        data = self.load_json(CLAUDE_DIR / "stats-cache.json")
+        # Live query from SQLite, fall back to stats-cache.json
+        try:
+            _sql_spec = importlib.util.spec_from_file_location(
+                "ccc_sql_data",
+                str(Path(__file__).parent / "ccc-sql-data.py"),
+            )
+            _sql_mod = importlib.util.module_from_spec(_sql_spec)
+            _sql_spec.loader.exec_module(_sql_mod)
+            data = _sql_mod.get_stats_data()
+        except Exception:
+            data = self.load_json(CLAUDE_DIR / "stats-cache.json")
         self.send_json(data)
 
     def get_cost(self, params: Dict[str, List[str]]) -> None:
@@ -598,12 +609,12 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             cache_total = (row["opus_cache"] or 0) + (row["sonnet_cache"] or 0) + (row["haiku_cache"] or 0)
             input_total = (row["opus_in"] or 0) + (row["sonnet_in"] or 0) + (row["haiku_in"] or 0)
             cache_eff = round(cache_total / max(cache_total + input_total, 1) * 100, 1)
-            # Daily cost breakdown (last 30 days)
+            # Daily cost breakdown (all time)
             daily_rows = conn.execute("""
                 SELECT date, opus_tokens_in, opus_tokens_out, opus_cache_read,
                        sonnet_tokens_in, sonnet_tokens_out, sonnet_cache_read,
                        haiku_tokens_in, haiku_tokens_out, haiku_cache_read
-                FROM daily_stats ORDER BY date DESC LIMIT 30
+                FROM daily_stats ORDER BY date ASC
             """).fetchall()
             daily_costs = []
             for d in daily_rows:
@@ -622,9 +633,9 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             conn.close()
             self.send_json(
                 {
-                    "today": daily_costs[0]["cost"] if daily_costs else 0,
-                    "thisWeek": round(sum(d["cost"] for d in daily_costs[:7]), 2),
-                    "thisMonth": round(sum(d["cost"] for d in daily_costs[:30]), 2),
+                    "today": daily_costs[-1]["cost"] if daily_costs else 0,
+                    "thisWeek": round(sum(d["cost"] for d in daily_costs[-7:]), 2),
+                    "thisMonth": round(sum(d["cost"] for d in daily_costs[-30:]), 2),
                     "savedViaCache": round(total_value - sub_paid, 2) if total_value > sub_paid else 0,
                     "cacheEfficiency": cache_eff,
                     "dailyCosts": daily_costs,
