@@ -47,7 +47,7 @@ try:
     with open(SYSTEM_CONFIG_FILE) as f:
         SYSTEM_CONFIG = json.load(f)
     LOCAL_TZ = ZoneInfo(SYSTEM_CONFIG.get("timezone", "America/New_York"))
-except:
+except Exception:
     LOCAL_TZ = ZoneInfo("America/New_York")
 CLAUDE_DIR = HOME / ".claude"
 KERNEL_DIR = CLAUDE_DIR / "kernel"
@@ -95,6 +95,7 @@ THRESHOLDS = {
 # Utilities
 # ============================================================================
 
+
 class Colors:
     GREEN = "\033[32m"
     YELLOW = "\033[33m"
@@ -136,8 +137,8 @@ def parse_timestamp(ts: Any) -> Optional[datetime]:
     # String formats
     if isinstance(ts, str):
         # ISO format with Z
-        if ts.endswith('Z'):
-            ts = ts[:-1] + '+00:00'
+        if ts.endswith("Z"):
+            ts = ts[:-1] + "+00:00"
         try:
             dt = datetime.fromisoformat(ts)
             if dt.tzinfo is None:
@@ -175,7 +176,7 @@ def now_local() -> datetime:
 def file_age_hours(filepath: Path) -> float:
     """Get file age in hours."""
     if not filepath.exists():
-        return float('inf')
+        return float("inf")
     mtime = datetime.fromtimestamp(filepath.stat().st_mtime, tz=LOCAL_TZ)
     return (now_local() - mtime).total_seconds() / 3600
 
@@ -184,8 +185,10 @@ def file_age_hours(filepath: Path) -> float:
 # Health Checks
 # ============================================================================
 
+
 class HealthCheck:
     """Individual health check result."""
+
     def __init__(self, name: str, category: str) -> None:
         self.name = name
         self.category = category
@@ -195,19 +198,19 @@ class HealthCheck:
         self.fix_action: Optional[str] = None
         self.details: Dict[str, Any] = {}
 
-    def ok(self, msg: str = "Healthy") -> 'HealthCheck':
+    def ok(self, msg: str = "Healthy") -> "HealthCheck":
         self.status = "ok"
         self.message = msg
         return self
 
-    def warn(self, msg: str, can_fix: bool = False, fix_action: Optional[str] = None) -> 'HealthCheck':
+    def warn(self, msg: str, can_fix: bool = False, fix_action: Optional[str] = None) -> "HealthCheck":
         self.status = "warn"
         self.message = msg
         self.can_fix = can_fix
         self.fix_action = fix_action
         return self
 
-    def error(self, msg: str, can_fix: bool = False, fix_action: Optional[str] = None) -> 'HealthCheck':
+    def error(self, msg: str, can_fix: bool = False, fix_action: Optional[str] = None) -> "HealthCheck":
         self.status = "error"
         self.message = msg
         self.can_fix = can_fix
@@ -224,17 +227,12 @@ def check_daemon_loaded(daemon_name: str) -> HealthCheck:
         return check.warn(f"Plist not found: {plist_path}", can_fix=False)
 
     try:
-        result = subprocess.run(
-            ["launchctl", "list"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        result = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=5)
 
         # Check if daemon appears in launchctl list
         if daemon_name in result.stdout:
             # Parse the line to get status
-            for line in result.stdout.split('\n'):
+            for line in result.stdout.split("\n"):
                 if daemon_name in line:
                     parts = line.split()
                     if len(parts) >= 3:
@@ -245,17 +243,11 @@ def check_daemon_loaded(daemon_name: str) -> HealthCheck:
                             return check.ok("Loaded (idle)")
                         else:
                             return check.warn(
-                                f"Loaded but exited with code {exit_code}",
-                                can_fix=True,
-                                fix_action="reload_daemon"
+                                f"Loaded but exited with code {exit_code}", can_fix=True, fix_action="reload_daemon"
                             )
             return check.ok("Loaded")
         else:
-            return check.error(
-                "Not loaded",
-                can_fix=True,
-                fix_action="load_daemon"
-            )
+            return check.error("Not loaded", can_fix=True, fix_action="load_daemon")
     except subprocess.TimeoutExpired:
         return check.error("launchctl timeout")
     except Exception as e:
@@ -286,11 +278,7 @@ def check_file_freshness(filepath: Path, max_age_hours: float, name: str) -> Hea
     if age <= max_age_hours:
         return check.ok(f"Fresh ({age:.1f}h old)")
     else:
-        return check.warn(
-            f"Stale ({age:.1f}h old, max {max_age_hours}h)",
-            can_fix=True,
-            fix_action="regenerate"
-        )
+        return check.warn(f"Stale ({age:.1f}h old, max {max_age_hours}h)", can_fix=True, fix_action="regenerate")
 
 
 def check_json_updated_field(filepath: Path, max_age_hours: float, name: str) -> HealthCheck:
@@ -305,7 +293,7 @@ def check_json_updated_field(filepath: Path, max_age_hours: float, name: str) ->
             data = json.load(f)
 
         # Try various timestamp field names
-        ts_value = data.get('updated') or data.get('lastUpdated') or data.get('generated')
+        ts_value = data.get("updated") or data.get("lastUpdated") or data.get("generated")
 
         if not ts_value:
             # Fall back to file mtime
@@ -322,11 +310,7 @@ def check_json_updated_field(filepath: Path, max_age_hours: float, name: str) ->
         if age <= max_age_hours:
             return check.ok(f"Fresh ({age:.1f}h old)")
         else:
-            return check.warn(
-                f"Stale ({age:.1f}h old, max {max_age_hours}h)",
-                can_fix=True,
-                fix_action="regenerate"
-            )
+            return check.warn(f"Stale ({age:.1f}h old, max {max_age_hours}h)", can_fix=True, fix_action="regenerate")
     except json.JSONDecodeError as e:
         return check.error(f"Invalid JSON: {e}", can_fix=True, fix_action="regenerate")
     except Exception as e:
@@ -345,7 +329,7 @@ def check_jsonl_health(filepath: Path, name: str) -> HealthCheck:
 
     try:
         content = filepath.read_text()
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             if not line.strip():
                 continue
             try:
@@ -364,12 +348,10 @@ def check_jsonl_health(filepath: Path, name: str) -> HealthCheck:
 
         error_rate = invalid / total
         if error_rate < THRESHOLDS["max_jsonl_error_rate"]:
-            return check.ok(f"{valid} valid, {invalid} invalid ({error_rate*100:.1f}%)")
+            return check.ok(f"{valid} valid, {invalid} invalid ({error_rate * 100:.1f}%)")
         else:
             return check.warn(
-                f"High error rate: {invalid}/{total} ({error_rate*100:.1f}%)",
-                can_fix=True,
-                fix_action="clean_jsonl"
+                f"High error rate: {invalid}/{total} ({error_rate * 100:.1f}%)", can_fix=True, fix_action="clean_jsonl"
             )
     except Exception as e:
         return check.error(f"Check failed: {e}")
@@ -396,7 +378,7 @@ def check_memory_links() -> HealthCheck:
             return check.warn(
                 f"Low count: {count:,} (need {THRESHOLDS['min_memory_links']:,}+)",
                 can_fix=True,
-                fix_action="populate_memory"
+                fix_action="populate_memory",
             )
     except Exception as e:
         return check.error(f"Check failed: {e}")
@@ -431,11 +413,7 @@ def check_stale_locks() -> HealthCheck:
     if not stale_locks:
         return check.ok("No stale locks")
     else:
-        return check.warn(
-            f"{len(stale_locks)} stale lock(s) found",
-            can_fix=True,
-            fix_action="clear_locks"
-        )
+        return check.warn(f"{len(stale_locks)} stale lock(s) found", can_fix=True, fix_action="clear_locks")
 
 
 def check_log_sizes() -> HealthCheck:
@@ -456,11 +434,7 @@ def check_log_sizes() -> HealthCheck:
     if not oversized:
         return check.ok("All logs within size limits")
     else:
-        return check.warn(
-            f"{len(oversized)} oversized log(s)",
-            can_fix=True,
-            fix_action="rotate_logs"
-        )
+        return check.warn(f"{len(oversized)} oversized log(s)", can_fix=True, fix_action="rotate_logs")
 
 
 def check_stale_claude_processes() -> HealthCheck:
@@ -468,18 +442,13 @@ def check_stale_claude_processes() -> HealthCheck:
     check = HealthCheck("stale_processes", "system")
 
     try:
-        result = subprocess.run(
-            ["ps", "aux"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        result = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=10)
 
         stale = []
         current_pid = str(os.getpid())
 
-        for line in result.stdout.split('\n'):
-            if 'claude --model' in line.lower() and 'grep' not in line:
+        for line in result.stdout.split("\n"):
+            if "claude --model" in line.lower() and "grep" not in line:
                 parts = line.split()
                 if len(parts) >= 10:
                     pid = parts[1]
@@ -490,7 +459,7 @@ def check_stale_claude_processes() -> HealthCheck:
                         continue
 
                     # Check if started on a different day (Wed, Thu, etc.)
-                    if any(day in start for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']):
+                    if any(day in start for day in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
                         cpu_time = parts[9]
                         stale.append({"pid": pid, "start": start, "cpu": cpu_time})
 
@@ -501,9 +470,7 @@ def check_stale_claude_processes() -> HealthCheck:
             return check.ok("No stale processes")
         else:
             return check.warn(
-                f"{len(stale)} stale Claude process(es) (>24h old)",
-                can_fix=True,
-                fix_action="kill_stale_processes"
+                f"{len(stale)} stale Claude process(es) (>24h old)", can_fix=True, fix_action="kill_stale_processes"
             )
     except Exception as e:
         return check.error(f"Check failed: {e}")
@@ -513,6 +480,7 @@ def check_stale_claude_processes() -> HealthCheck:
 # Fix Actions
 # ============================================================================
 
+
 def fix_load_daemon(daemon_name: str) -> Tuple[bool, str]:
     """Load a LaunchAgent daemon."""
     plist_path = LAUNCH_AGENTS / f"{daemon_name}.plist"
@@ -521,12 +489,7 @@ def fix_load_daemon(daemon_name: str) -> Tuple[bool, str]:
         return False, f"Plist not found: {plist_path}"
 
     try:
-        result = subprocess.run(
-            ["launchctl", "load", str(plist_path)],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        result = subprocess.run(["launchctl", "load", str(plist_path)], capture_output=True, text=True, timeout=10)
 
         if result.returncode == 0:
             return True, f"Loaded {daemon_name}"
@@ -542,19 +505,10 @@ def fix_reload_daemon(daemon_name: str) -> Tuple[bool, str]:
 
     try:
         # Unload first
-        subprocess.run(
-            ["launchctl", "unload", str(plist_path)],
-            capture_output=True,
-            timeout=5
-        )
+        subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True, timeout=5)
 
         # Then load
-        result = subprocess.run(
-            ["launchctl", "load", str(plist_path)],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        result = subprocess.run(["launchctl", "load", str(plist_path)], capture_output=True, text=True, timeout=10)
 
         if result.returncode == 0:
             return True, f"Reloaded {daemon_name}"
@@ -571,12 +525,7 @@ def fix_regenerate_kernel_data() -> Tuple[bool, str]:
         return False, f"Script not found: {script}"
 
     try:
-        result = subprocess.run(
-            ["python3", str(script)],
-            capture_output=True,
-            text=True,
-            timeout=300
-        )
+        result = subprocess.run(["python3", str(script)], capture_output=True, text=True, timeout=300)
         return result.returncode == 0, result.stderr[:200] if result.returncode != 0 else "Regenerated"
     except Exception as e:
         return False, f"Error: {e}"
@@ -589,12 +538,7 @@ def fix_populate_memory() -> Tuple[bool, str]:
         return False, f"Script not found: {script}"
 
     try:
-        result = subprocess.run(
-            ["python3", str(script)],
-            capture_output=True,
-            text=True,
-            timeout=300
-        )
+        result = subprocess.run(["python3", str(script)], capture_output=True, text=True, timeout=300)
         return result.returncode == 0, result.stderr[:200] if result.returncode != 0 else "Populated"
     except Exception as e:
         return False, f"Error: {e}"
@@ -641,15 +585,15 @@ def fix_rotate_logs() -> Tuple[bool, str]:
             try:
                 # Keep last 10% of file
                 content = log_file.read_text()
-                lines = content.split('\n')
-                keep_lines = lines[int(len(lines) * 0.9):]
+                lines = content.split("\n")
+                keep_lines = lines[int(len(lines) * 0.9) :]
 
                 # Archive the old content
-                archive = log_file.with_suffix('.log.old')
+                archive = log_file.with_suffix(".log.old")
                 archive.write_text(content)
 
                 # Write truncated content
-                log_file.write_text('\n'.join(keep_lines))
+                log_file.write_text("\n".join(keep_lines))
                 rotated += 1
             except Exception:
                 pass
@@ -669,15 +613,10 @@ def fix_kill_stale_processes() -> Tuple[bool, str]:
 
     try:
         # Find stale processes
-        result = subprocess.run(
-            ["ps", "aux"],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        result = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=10)
 
-        for line in result.stdout.split('\n'):
-            if 'claude --model' in line.lower() and 'grep' not in line:
+        for line in result.stdout.split("\n"):
+            if "claude --model" in line.lower() and "grep" not in line:
                 parts = line.split()
                 if len(parts) >= 10:
                     pid = parts[1]
@@ -688,7 +627,7 @@ def fix_kill_stale_processes() -> Tuple[bool, str]:
                         continue
 
                     # Check if started on a different day (shows day name like "Wed")
-                    if any(day in start for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']):
+                    if any(day in start for day in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
                         stale_pids.append(pid)
 
         if not stale_pids:
@@ -698,7 +637,7 @@ def fix_kill_stale_processes() -> Tuple[bool, str]:
         for pid in stale_pids:
             try:
                 subprocess.run(["kill", "-TERM", pid], capture_output=True, timeout=2)
-            except:
+            except Exception:
                 pass
 
         # Wait for graceful shutdown
@@ -713,7 +652,7 @@ def fix_kill_stale_processes() -> Tuple[bool, str]:
                 survivors.append(pid)
                 try:
                     subprocess.run(["kill", "-9", pid], capture_output=True, timeout=2)
-                except:
+                except Exception:
                     pass
 
         killed_graceful = len(stale_pids) - len(survivors)
@@ -733,10 +672,13 @@ def log_learning(fix_name: str, issue: str, solution: str, category: str = "self
         conn = sqlite3.connect(str(MEMORY_DB))
         learning_id = f"autofix-{fix_name}-{int(now_local().timestamp())}"
         content = f"Auto-fixed: {issue}. Solution: {solution}"
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO learnings (id, content, category, project, quality, date)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (learning_id, content, category, "ccc-infrastructure", 4.0, now_local().strftime("%Y-%m-%d")))
+        """,
+            (learning_id, content, category, "ccc-infrastructure", 4.0, now_local().strftime("%Y-%m-%d")),
+        )
         conn.commit()
         conn.close()
     except Exception:
@@ -752,7 +694,7 @@ def fix_clean_jsonl(filepath: Path) -> Tuple[bool, str]:
         valid_lines = []
         invalid_count = 0
 
-        for line in filepath.read_text().split('\n'):
+        for line in filepath.read_text().split("\n"):
             if not line.strip():
                 continue
             try:
@@ -762,11 +704,11 @@ def fix_clean_jsonl(filepath: Path) -> Tuple[bool, str]:
                 invalid_count += 1
 
         # Backup original
-        backup = filepath.with_suffix(filepath.suffix + '.backup')
+        backup = filepath.with_suffix(filepath.suffix + ".backup")
         filepath.rename(backup)
 
         # Write cleaned file
-        filepath.write_text('\n'.join(valid_lines) + '\n')
+        filepath.write_text("\n".join(valid_lines) + "\n")
 
         return True, f"Removed {invalid_count} invalid lines (backup at {backup.name})"
     except Exception as e:
@@ -781,11 +723,7 @@ def fix_run_dashboard_generator() -> Tuple[bool, str]:
 
     try:
         result = subprocess.run(
-            ["bash", str(script), "--no-open"],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            cwd=str(SCRIPTS_DIR)
+            ["bash", str(script), "--no-open"], capture_output=True, text=True, timeout=60, cwd=str(SCRIPTS_DIR)
         )
         return result.returncode == 0, "Dashboard regenerated" if result.returncode == 0 else result.stderr[:200]
     except Exception as e:
@@ -795,6 +733,7 @@ def fix_run_dashboard_generator() -> Tuple[bool, str]:
 # ============================================================================
 # Main Engine
 # ============================================================================
+
 
 class SelfHealingEngine:
     """The self-healing engine that orchestrates all checks and fixes."""
@@ -817,25 +756,23 @@ class SelfHealingEngine:
         if self.verbose:
             log("Checking data freshness...", "INFO")
 
-        kernel_files = ['cost-data.json', 'productivity-data.json', 'coevo-data.json']
+        kernel_files = ["cost-data.json", "productivity-data.json", "coevo-data.json"]
         for filename in kernel_files:
-            self.checks.append(check_json_updated_field(
-                KERNEL_DIR / filename,
-                THRESHOLDS["kernel_max_age_hours"],
-                filename
-            ))
+            self.checks.append(
+                check_json_updated_field(KERNEL_DIR / filename, THRESHOLDS["kernel_max_age_hours"], filename)
+            )
 
-        self.checks.append(check_file_freshness(
-            CLAUDE_DIR / "stats-cache.json",
-            THRESHOLDS["stats_max_age_hours"],
-            "stats-cache.json"
-        ))
+        self.checks.append(
+            check_file_freshness(CLAUDE_DIR / "stats-cache.json", THRESHOLDS["stats_max_age_hours"], "stats-cache.json")
+        )
 
-        self.checks.append(check_file_freshness(
-            CLAUDE_DIR / "dashboard/claude-command-center.html",
-            1,  # Dashboard should be fresh within 1 hour
-            "dashboard"
-        ))
+        self.checks.append(
+            check_file_freshness(
+                CLAUDE_DIR / "dashboard/claude-command-center.html",
+                1,  # Dashboard should be fresh within 1 hour
+                "dashboard",
+            )
+        )
 
         # 3. Memory checks
         if self.verbose:
@@ -846,10 +783,10 @@ class SelfHealingEngine:
         if self.verbose:
             log("Checking JSONL files...", "INFO")
         jsonl_files = [
-            'activity-events.jsonl',
-            'session-outcomes.jsonl',
-            'routing-metrics.jsonl',
-            'recovery-outcomes.jsonl',
+            "activity-events.jsonl",
+            "session-outcomes.jsonl",
+            "routing-metrics.jsonl",
+            "recovery-outcomes.jsonl",
         ]
         for filename in jsonl_files:
             self.checks.append(check_jsonl_health(DATA_DIR / filename, filename))
@@ -863,7 +800,7 @@ class SelfHealingEngine:
 
     def apply_fixes(self) -> None:
         """Apply fixes for issues that can be auto-fixed."""
-        fixable = [c for c in self.checks if c.status in ('warn', 'error') and c.can_fix]
+        fixable = [c for c in self.checks if c.status in ("warn", "error") and c.can_fix]
 
         if not fixable:
             return
@@ -902,10 +839,7 @@ class SelfHealingEngine:
                 log(f"Fixed: {check.name} - {message}", "FIX")
                 # Log learning for successful fixes
                 log_learning(
-                    fix_name=action,
-                    issue=f"{check.name}: {check.message}",
-                    solution=message,
-                    category=check.category
+                    fix_name=action, issue=f"{check.name}: {check.message}", solution=message, category=check.category
                 )
             else:
                 log(f"Fix failed: {check.name} - {message}", "ERROR")
@@ -934,19 +868,16 @@ class SelfHealingEngine:
                 }
                 for c in self.checks
             ],
-            "fixes": [
-                {"name": name, "success": success, "message": msg}
-                for name, success, msg in self.fixes_applied
-            ],
+            "fixes": [{"name": name, "success": success, "message": msg} for name, success, msg in self.fixes_applied],
         }
 
     def print_summary(self) -> None:
         """Print a formatted summary."""
         report = self.report()
 
-        print(f"\n{Colors.BOLD}{'='*60}{Colors.RESET}")
+        print(f"\n{Colors.BOLD}{'=' * 60}{Colors.RESET}")
         print(f"{Colors.BOLD}CCC Self-Healing Report{Colors.RESET}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Status overview
         ok = report["ok"]
@@ -955,7 +886,11 @@ class SelfHealingEngine:
         total = report["total_checks"]
 
         status_color = Colors.GREEN if err == 0 and warn == 0 else (Colors.YELLOW if err == 0 else Colors.RED)
-        print(f"\nStatus: {status_color}{'HEALTHY' if err == 0 and warn == 0 else 'DEGRADED' if err == 0 else 'UNHEALTHY'}{Colors.RESET}")
+        print(
+            f"\nStatus: {status_color}"
+            f"{'HEALTHY' if err == 0 and warn == 0 else 'DEGRADED' if err == 0 else 'UNHEALTHY'}"
+            f"{Colors.RESET}"
+        )
         print(f"Checks: {ok}/{total} OK, {warn} warnings, {err} errors")
 
         # Category breakdown
@@ -971,7 +906,7 @@ class SelfHealingEngine:
             print(f"  {status} {cat}: {counts['ok']} ok, {counts['warn']} warn, {counts['error']} error")
 
         # Issues found
-        issues = [c for c in self.checks if c.status in ('warn', 'error')]
+        issues = [c for c in self.checks if c.status in ("warn", "error")]
         if issues:
             print(f"\n{Colors.BOLD}Issues Found:{Colors.RESET}")
             for check in issues:
@@ -989,13 +924,18 @@ class SelfHealingEngine:
                 print(f"  {color}{icon} {name}: {msg}{Colors.RESET}")
 
         # Recommendations
-        unfixed = [c for c in self.checks if c.status in ('warn', 'error') and c.can_fix and
-                   not any(f[0] == c.name and f[1] for f in self.fixes_applied)]
+        unfixed = [
+            c
+            for c in self.checks
+            if c.status in ("warn", "error")
+            and c.can_fix
+            and not any(f[0] == c.name and f[1] for f in self.fixes_applied)
+        ]
         if unfixed and not self.auto_fix:
             print(f"\n{Colors.BOLD}Recommended:{Colors.RESET}")
             print(f"  Run with --fix to auto-repair {len(unfixed)} issue(s)")
 
-        print(f"\n{'='*60}\n")
+        print(f"\n{'=' * 60}\n")
 
 
 def evolve_from_patterns() -> None:
@@ -1009,7 +949,7 @@ def evolve_from_patterns() -> None:
 
     # Analyze success rates by action
     actions = {}
-    for line in outcomes_file.read_text().split('\n'):
+    for line in outcomes_file.read_text().split("\n"):
         if not line.strip():
             continue
         try:
@@ -1053,10 +993,7 @@ def main() -> int:
         return 0
 
     # Run the engine
-    engine = SelfHealingEngine(
-        auto_fix=args.fix and not args.status,
-        verbose=not args.quiet
-    )
+    engine = SelfHealingEngine(auto_fix=args.fix and not args.status, verbose=not args.quiet)
 
     engine.run_all_checks()
 
@@ -1070,7 +1007,7 @@ def main() -> int:
 
     # Log outcome with dual-write to JSONL + SQLite
     try:
-        ts = int(now_local().timestamp())
+        int(now_local().timestamp())
         ok_count = engine.report()["ok"]
         warn_count = engine.report()["warnings"]
         error_count = engine.report()["errors"]
@@ -1080,12 +1017,7 @@ def main() -> int:
         sys.path.insert(0, str(HOME / ".claude/hooks"))
         from dual_write_lib import log_self_heal_outcome
 
-        log_self_heal_outcome(
-            ok=ok_count,
-            warn=warn_count,
-            error=error_count,
-            fixed=fixed_count
-        )
+        log_self_heal_outcome(ok=ok_count, warn=warn_count, error=error_count, fixed=fixed_count)
     except Exception as e:
         sys.stderr.write(f"Warning: Failed to log self-heal outcome: {e}\n")
 

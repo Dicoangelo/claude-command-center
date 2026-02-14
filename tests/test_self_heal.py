@@ -2,14 +2,11 @@
 
 import json
 import os
-import sqlite3
 import time
 from datetime import datetime, timezone
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 # ── Load the module ─────────────────────────────────────────────────
 SCRIPT = Path(__file__).parent.parent / "scripts" / "ccc-self-heal.py"
@@ -319,7 +316,7 @@ class TestFixCleanJsonl:
         success, msg = heal.fix_clean_jsonl(f)
         assert success is True
         assert "Removed 1" in msg
-        lines = [l for l in f.read_text().strip().split("\n") if l]
+        lines = [ln for ln in f.read_text().strip().split("\n") if ln]
         assert len(lines) == 2
         assert (tmp_path / "data.jsonl.backup").exists()
 
@@ -359,8 +356,17 @@ class TestSelfHealingEngine:
         hc.ok("fine")
         engine.checks.append(hc)
         report = engine.report()
-        for key in ("timestamp", "total_checks", "ok", "warnings", "errors",
-                     "fixes_applied", "fixes_successful", "checks", "fixes"):
+        for key in (
+            "timestamp",
+            "total_checks",
+            "ok",
+            "warnings",
+            "errors",
+            "fixes_applied",
+            "fixes_successful",
+            "checks",
+            "fixes",
+        ):
             assert key in report, f"Missing report key: {key}"
 
     def test_report_counts(self):

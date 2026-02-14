@@ -35,21 +35,28 @@ if errors_file.exists():
 
                 # Keep last 10
                 if len(error_stats["recent"]) < 10:
-                    error_stats["recent"].append({
-                        "type": error_type,
-                        "message": err.get("message") or err.get("line", "")[:100],
-                        "ts": err.get("ts", 0),
-                        "severity": err.get("severity", "unknown")
-                    })
-            except:
+                    error_stats["recent"].append(
+                        {
+                            "type": error_type,
+                            "message": err.get("message") or err.get("line", "")[:100],
+                            "ts": err.get("ts", 0),
+                            "severity": err.get("severity", "unknown"),
+                        }
+                    )
+            except Exception:
                 pass
 
     # Write error stats
-    (KERNEL_DIR / "error-stats.json").write_text(json.dumps({
-        "total_errors": error_stats["total"],
-        "by_type": dict(error_stats["by_type"].most_common(10)),
-        "recent_errors": error_stats["recent"]
-    }, indent=2))
+    (KERNEL_DIR / "error-stats.json").write_text(
+        json.dumps(
+            {
+                "total_errors": error_stats["total"],
+                "by_type": dict(error_stats["by_type"].most_common(10)),
+                "recent_errors": error_stats["recent"],
+            },
+            indent=2,
+        )
+    )
     print(f"  ✅ Processed {error_stats['total']} errors")
 
 # ═══════════════════════════════════════════════════════════════
@@ -67,14 +74,19 @@ if tool_usage_file.exists():
                 tool_stats["total"] += 1
                 tool_stats["by_tool"][entry.get("tool", "unknown")] += 1
                 tool_stats["by_model"][entry.get("model", "unknown")] += 1
-            except:
+            except Exception:
                 pass
 
-    (KERNEL_DIR / "tool-usage-stats.json").write_text(json.dumps({
-        "total_calls": tool_stats["total"],
-        "top_tools": dict(tool_stats["by_tool"].most_common(20)),
-        "by_model": dict(tool_stats["by_model"])
-    }, indent=2))
+    (KERNEL_DIR / "tool-usage-stats.json").write_text(
+        json.dumps(
+            {
+                "total_calls": tool_stats["total"],
+                "top_tools": dict(tool_stats["by_tool"].most_common(20)),
+                "by_model": dict(tool_stats["by_model"]),
+            },
+            indent=2,
+        )
+    )
     print(f"  ✅ Processed {tool_stats['total']} tool calls")
 
 # ═══════════════════════════════════════════════════════════════
@@ -98,14 +110,19 @@ if activity_file.exists():
                 if ts:
                     day = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
                     activity_stats["daily"][day] += 1
-            except:
+            except Exception:
                 pass
 
-    (KERNEL_DIR / "activity-stats.json").write_text(json.dumps({
-        "total_events": activity_stats["total"],
-        "by_type": dict(activity_stats["by_type"].most_common(10)),
-        "daily_activity": dict(sorted(activity_stats["daily"].items(), reverse=True)[:30])
-    }, indent=2))
+    (KERNEL_DIR / "activity-stats.json").write_text(
+        json.dumps(
+            {
+                "total_events": activity_stats["total"],
+                "by_type": dict(activity_stats["by_type"].most_common(10)),
+                "daily_activity": dict(sorted(activity_stats["daily"].items(), reverse=True)[:30]),
+            },
+            indent=2,
+        )
+    )
     print(f"  ✅ Processed {activity_stats['total']} activity events")
 
 # ═══════════════════════════════════════════════════════════════
@@ -128,14 +145,21 @@ if recovery_file.exists():
                 # Handle both 'pattern' and 'category' fields
                 pattern = outcome.get("pattern") or outcome.get("category", "unknown")
                 recovery_stats["by_pattern"][pattern] += 1
-            except:
+            except Exception:
                 pass
 
-    (KERNEL_DIR / "recovery-stats.json").write_text(json.dumps({
-        "total_recoveries": recovery_stats["total"],
-        "success_rate": round(recovery_stats["success"] / recovery_stats["total"] * 100, 1) if recovery_stats["total"] > 0 else 0,
-        "by_pattern": dict(recovery_stats["by_pattern"].most_common(10))
-    }, indent=2))
+    (KERNEL_DIR / "recovery-stats.json").write_text(
+        json.dumps(
+            {
+                "total_recoveries": recovery_stats["total"],
+                "success_rate": round(recovery_stats["success"] / recovery_stats["total"] * 100, 1)
+                if recovery_stats["total"] > 0
+                else 0,
+                "by_pattern": dict(recovery_stats["by_pattern"].most_common(10)),
+            },
+            indent=2,
+        )
+    )
     print(f"  ✅ Processed {recovery_stats['total']} recovery attempts")
 
 # ═══════════════════════════════════════════════════════════════
@@ -166,19 +190,24 @@ if flow_file.exists():
                             hour = datetime.fromtimestamp(ts_raw).hour
                         if score > 0.5:  # Meaningful flow (lowered from 0.7 to capture more data)
                             flow_stats["peak_hours"][hour] += 1
-                    except:
+                    except Exception:
                         pass
-            except:
+            except Exception:
                 pass
 
     if flow_scores:
         flow_stats["avg_flow"] = round(sum(flow_scores) / len(flow_scores), 3)
 
-    (KERNEL_DIR / "flow-stats.json").write_text(json.dumps({
-        "total_measurements": flow_stats["total_measurements"],
-        "average_flow_score": flow_stats["avg_flow"],
-        "peak_flow_hours": dict(flow_stats["peak_hours"].most_common(5))
-    }, indent=2))
+    (KERNEL_DIR / "flow-stats.json").write_text(
+        json.dumps(
+            {
+                "total_measurements": flow_stats["total_measurements"],
+                "average_flow_score": flow_stats["avg_flow"],
+                "peak_flow_hours": dict(flow_stats["peak_hours"].most_common(5)),
+            },
+            indent=2,
+        )
+    )
     print(f"  ✅ Processed {flow_stats['total_measurements']} flow measurements")
 
 # ═══════════════════════════════════════════════════════════════
@@ -197,13 +226,15 @@ if cmd_file.exists():
                 # Source data uses "cmd" field, not "command"
                 cmd = entry.get("cmd") or entry.get("command", "unknown")
                 cmd_stats["by_command"][cmd] += entry.get("count", 1)
-            except:
+            except Exception:
                 pass
 
-    (KERNEL_DIR / "command-stats.json").write_text(json.dumps({
-        "total_commands": cmd_stats["total"],
-        "top_commands": dict(cmd_stats["by_command"].most_common(15))
-    }, indent=2))
+    (KERNEL_DIR / "command-stats.json").write_text(
+        json.dumps(
+            {"total_commands": cmd_stats["total"], "top_commands": dict(cmd_stats["by_command"].most_common(15))},
+            indent=2,
+        )
+    )
     print(f"  ✅ Processed {cmd_stats['total']} commands")
 
 # ═══════════════════════════════════════════════════════════════
@@ -227,7 +258,7 @@ if success_file.exists():
                 if success:
                     success_stats["success"] += 1
                     success_stats["by_tool"][tool]["success"] += 1
-            except:
+            except Exception:
                 pass
 
     # Calculate success rates
@@ -236,10 +267,17 @@ if success_file.exists():
         rate = round(data["success"] / data["total"] * 100, 1) if data["total"] > 0 else 0
         tool_success_rates[tool] = {"rate": rate, "total": data["total"]}
 
-    (KERNEL_DIR / "tool-success-stats.json").write_text(json.dumps({
-        "overall_success_rate": round(success_stats["success"] / success_stats["total"] * 100, 1) if success_stats["total"] > 0 else 0,
-        "by_tool": dict(sorted(tool_success_rates.items(), key=lambda x: -x[1]["total"])[:20])
-    }, indent=2))
+    (KERNEL_DIR / "tool-success-stats.json").write_text(
+        json.dumps(
+            {
+                "overall_success_rate": round(success_stats["success"] / success_stats["total"] * 100, 1)
+                if success_stats["total"] > 0
+                else 0,
+                "by_tool": dict(sorted(tool_success_rates.items(), key=lambda x: -x[1]["total"])[:20]),
+            },
+            indent=2,
+        )
+    )
     print(f"  ✅ Processed {success_stats['total']} tool success records")
 
 print("\n✅ All untracked data sources integrated!")

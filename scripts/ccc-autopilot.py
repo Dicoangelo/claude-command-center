@@ -36,7 +36,7 @@ def log(msg: str, level: str = "INFO"):
         AUTOPILOT_LOG.parent.mkdir(parents=True, exist_ok=True)
         with open(AUTOPILOT_LOG, "a") as f:
             f.write(line + "\n")
-    except:
+    except Exception:
         pass
 
 
@@ -45,7 +45,7 @@ def run_script(script: str, args: list = None) -> dict:
     cmd = ["python3", str(SCRIPTS_DIR / script)]
     if args:
         cmd.extend(args)
-    
+
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         return {
@@ -69,7 +69,7 @@ def autopilot_cycle() -> dict:
         "health": None,
         "actions_taken": [],
     }
-    
+
     # 1. Brain thinks
     log("Brain: analyzing patterns...")
     brain_result = run_script("ccc-autonomous-brain.py", ["--think", "--json"])
@@ -82,9 +82,9 @@ def autopilot_cycle() -> dict:
             if results["brain"].get("preventions"):
                 log(f"Brain: applied {len(results['brain']['preventions'])} preventions")
                 results["actions_taken"].append("proactive_prevention")
-        except:
+        except Exception:
             pass
-    
+
     # 2. Intelligence assessment
     log("Intelligence: assessing system state...")
     intel_result = run_script("ccc-intelligence-layer.py", ["--dashboard"])
@@ -95,9 +95,9 @@ def autopilot_cycle() -> dict:
             if cost.get("status") == "warning":
                 log(f"Intelligence: cost warning - ${cost.get('predicted_total', 0):.2f} predicted", "WARN")
                 results["actions_taken"].append("cost_warning")
-        except:
+        except Exception:
             pass
-    
+
     # 3. Health check & repair
     log("Self-heal: checking health...")
     health_result = run_script("ccc-self-heal.py", ["--fix", "--json"])
@@ -107,13 +107,13 @@ def autopilot_cycle() -> dict:
             if results["health"].get("fixes_applied", 0) > 0:
                 log(f"Self-heal: applied {results['health']['fixes_applied']} fixes")
                 results["actions_taken"].append("auto_repair")
-        except:
+        except Exception:
             pass
-    
+
     # 4. Summary
     duration = (datetime.now(LOCAL_TZ) - cycle_start).total_seconds()
     log(f"Cycle complete in {duration:.1f}s: {len(results['actions_taken'])} actions")
-    
+
     return results
 
 
@@ -123,22 +123,22 @@ def run_autopilot(cycles: int = None, interval: int = 300):
     log("CCC AUTOPILOT STARTING")
     log(f"Interval: {interval}s | Cycles: {'infinite' if cycles is None else cycles}")
     log("=" * 60)
-    
+
     cycle_count = 0
     try:
         while cycles is None or cycle_count < cycles:
             cycle_count += 1
             log(f"--- Cycle {cycle_count} ---")
-            
-            results = autopilot_cycle()
-            
+
+            autopilot_cycle()
+
             if cycles is None or cycle_count < cycles:
                 log(f"Sleeping {interval}s until next cycle...")
                 time.sleep(interval)
-    
+
     except KeyboardInterrupt:
         log("Autopilot stopped by user")
-    
+
     log(f"Autopilot completed: {cycle_count} cycles")
 
 

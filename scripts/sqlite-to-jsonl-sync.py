@@ -21,20 +21,23 @@ ACTIVITY_EVENTS_FILE = DATA_DIR / "activity-events.jsonl"
 COMMAND_USAGE_FILE = DATA_DIR / "command-usage.jsonl"
 TOOL_SUCCESS_FILE = DATA_DIR / "tool-success.jsonl"
 
+
 def load_sync_state():
     """Load last sync timestamp."""
     if STATE_FILE.exists():
         try:
             with open(STATE_FILE) as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     return {"last_sync_ts": 0}
+
 
 def save_sync_state(ts):
     """Save last sync timestamp."""
     with open(STATE_FILE, "w") as f:
         json.dump({"last_sync_ts": ts, "last_sync_date": datetime.now().isoformat()}, f)
+
 
 def sync_tool_events():
     """Export new tool events from SQLite to JSONL."""
@@ -46,12 +49,15 @@ def sync_tool_events():
     cursor = conn.cursor()
 
     # Get new tool events since last sync
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT ts, tool, file_path, session_pwd, metadata
         FROM tool_events
         WHERE ts > ?
         ORDER BY ts ASC
-    """, (last_ts,))
+    """,
+        (last_ts,),
+    )
 
     new_events = 0
     max_ts = last_ts
@@ -73,17 +79,12 @@ def sync_tool_events():
         if row["metadata"]:
             try:
                 metadata = json.loads(row["metadata"])
-            except:
+            except Exception:
                 pass
 
         # Session events
         if tool.startswith("session_"):
-            session_events.append({
-                "ts": ts,
-                "event": tool,
-                "pwd": row["session_pwd"],
-                "metadata": metadata
-            })
+            session_events.append({"ts": ts, "event": tool, "pwd": row["session_pwd"], "metadata": metadata})
 
         # Tool usage with details from metadata
         else:
@@ -93,47 +94,55 @@ def sync_tool_events():
             model = metadata.get("model", "sonnet")
 
             # Tool usage entry
-            tool_usage_entries.append({
-                "ts": ts,
-                "tool": tool,
-                "session": session_id,
-                "model": model,
-                "source": "sqlite",
-                "file_path": file_path,
-                "command": command or "",
-                "success": success
-            })
+            tool_usage_entries.append(
+                {
+                    "ts": ts,
+                    "tool": tool,
+                    "session": session_id,
+                    "model": model,
+                    "source": "sqlite",
+                    "file_path": file_path,
+                    "command": command or "",
+                    "success": success,
+                }
+            )
 
             # Tool success entry
-            tool_success_entries.append({
-                "ts": ts,
-                "tool": tool,
-                "success": success,
-                "exit_code": metadata.get("exit_code", 0),
-                "session": session_id
-            })
+            tool_success_entries.append(
+                {
+                    "ts": ts,
+                    "tool": tool,
+                    "success": success,
+                    "exit_code": metadata.get("exit_code", 0),
+                    "session": session_id,
+                }
+            )
 
             # Command usage (for Bash tools)
             if tool == "Bash" and command:
                 base_cmd = command.split()[0] if command else "unknown"
-                command_usage_entries.append({
-                    "ts": ts,
-                    "command": base_cmd,
-                    "full_command": command[:200],
-                    "success": success,
-                    "session": session_id
-                })
+                command_usage_entries.append(
+                    {
+                        "ts": ts,
+                        "command": base_cmd,
+                        "full_command": command[:200],
+                        "success": success,
+                        "session": session_id,
+                    }
+                )
 
             # Activity events with details
-            activity_events.append({
-                "ts": ts,
-                "type": "tool_use",
-                "tool": tool,
-                "file_path": file_path,
-                "command": command[:200] if command else "",
-                "success": success,
-                "pwd": row["session_pwd"]
-            })
+            activity_events.append(
+                {
+                    "ts": ts,
+                    "type": "tool_use",
+                    "tool": tool,
+                    "file_path": file_path,
+                    "command": command[:200] if command else "",
+                    "success": success,
+                    "pwd": row["session_pwd"],
+                }
+            )
 
         new_events += 1
 
@@ -171,6 +180,7 @@ def sync_tool_events():
 
     return new_events
 
+
 if __name__ == "__main__":
     try:
         count = sync_tool_events()
@@ -178,4 +188,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ Sync failed: {e}")
         import sys
+
         sys.exit(1)

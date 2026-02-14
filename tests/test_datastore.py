@@ -17,12 +17,12 @@ class TestDatastoreInit:
 
     def test_creates_database(self, tmp_path):
         db_path = tmp_path / "test.db"
-        ds = Datastore(db_path)
+        Datastore(db_path)
         assert db_path.exists()
 
     def test_wal_mode(self, tmp_path):
         db_path = tmp_path / "test.db"
-        ds = Datastore(db_path)
+        Datastore(db_path)
         conn = sqlite3.connect(str(db_path))
         mode = conn.execute("PRAGMA journal_mode").fetchone()[0]
         conn.close()

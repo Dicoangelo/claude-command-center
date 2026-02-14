@@ -39,6 +39,7 @@ CRITICAL_DAEMONS = [
     "com.claude.capability-sync",
 ]
 
+
 def log(msg: str):
     """Append to watchdog log."""
     timestamp = datetime.now(LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S %Z")
@@ -48,36 +49,29 @@ def log(msg: str):
         LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(LOG_FILE, "a") as f:
             f.write(line + "\n")
-    except:
+    except Exception:
         pass
+
 
 def get_loaded_daemons() -> set:
     """Get set of all loaded daemons (single launchctl call)."""
     try:
-        result = subprocess.run(
-            ["launchctl", "list"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        result = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=5)
         return set(result.stdout)
-    except:
+    except Exception:
         return set()
+
 
 def is_daemon_loaded(name: str, launchctl_output: str = None) -> bool:
     """Check if daemon is loaded. Pass launchctl_output to avoid repeated calls."""
     if launchctl_output is not None:
         return name in launchctl_output
     try:
-        result = subprocess.run(
-            ["launchctl", "list"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        result = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=5)
         return name in result.stdout
-    except:
+    except Exception:
         return False
+
 
 def load_daemon(name: str) -> bool:
     """Load a daemon."""
@@ -88,18 +82,9 @@ def load_daemon(name: str) -> bool:
 
     try:
         # Unload first (ignore errors)
-        subprocess.run(
-            ["launchctl", "unload", str(plist)],
-            capture_output=True,
-            timeout=5
-        )
+        subprocess.run(["launchctl", "unload", str(plist)], capture_output=True, timeout=5)
         # Then load
-        result = subprocess.run(
-            ["launchctl", "load", str(plist)],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        result = subprocess.run(["launchctl", "load", str(plist)], capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
             log(f"LOADED {name}")
             return True
@@ -110,18 +95,14 @@ def load_daemon(name: str) -> bool:
         log(f"ERROR {name}: {e}")
         return False
 
+
 def check_and_heal():
     """Check all daemons, reload any that are down."""
     # Single launchctl call for efficiency and consistency
     try:
-        result = subprocess.run(
-            ["launchctl", "list"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+        result = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=5)
         launchctl_output = result.stdout
-    except:
+    except Exception:
         launchctl_output = ""
 
     healed = 0
@@ -135,6 +116,7 @@ def check_and_heal():
                 healed_daemons.add(daemon)
 
     return healed
+
 
 def ensure_data_fresh():
     """Quick check that critical data files exist and are being updated."""
@@ -152,20 +134,22 @@ def ensure_data_fresh():
                     ["bash", str(CLAUDE_DIR / "scripts/ccc-generator.sh"), "--no-open"],
                     capture_output=True,
                     timeout=60,
-                    cwd=str(CLAUDE_DIR / "scripts")
+                    cwd=str(CLAUDE_DIR / "scripts"),
                 )
                 log("REGENERATED dashboard")
-            except:
+            except Exception:
                 pass
             break
+
 
 def write_heartbeat():
     """Write heartbeat file so other processes know watchdog is alive."""
     heartbeat = CLAUDE_DIR / ".watchdog-heartbeat"
     try:
         heartbeat.write_text(datetime.now(LOCAL_TZ).isoformat())
-    except:
+    except Exception:
         pass
+
 
 def main():
     """Main watchdog loop - called every 60s by launchd."""
@@ -177,14 +161,22 @@ def main():
         log(f"HEALED {healed} daemon(s)")
         # Send notification
         try:
-            subprocess.run([
-                "osascript", "-e",
-                f'display notification "Reloaded {healed} daemon(s)" with title "CCC Watchdog" subtitle "Infrastructure restored"'
-            ], capture_output=True, timeout=2)
-        except:
+            subprocess.run(
+                [
+                    "osascript",
+                    "-e",
+                    f'display notification "Reloaded {healed} daemon(s)"'
+                    f' with title "CCC Watchdog"'
+                    f' subtitle "Infrastructure restored"',
+                ],
+                capture_output=True,
+                timeout=2,
+            )
+        except Exception:
             pass
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

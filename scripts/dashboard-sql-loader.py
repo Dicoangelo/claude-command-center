@@ -10,7 +10,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-DB_PATH = Path.home() / '.claude/data/claude.db'
+DB_PATH = Path.home() / ".claude/data/claude.db"
+
 
 class DashboardData:
     """Helper class for dashboard SQLite queries"""
@@ -37,7 +38,8 @@ class DashboardData:
         """Get tool usage summary for last N days"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT
                 tool_name,
                 COUNT(*) as total_calls,
@@ -49,7 +51,9 @@ class DashboardData:
             WHERE timestamp > ?
             GROUP BY tool_name
             ORDER BY total_calls DESC
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         return [dict(row) for row in cursor.fetchall()]
 
@@ -58,19 +62,25 @@ class DashboardData:
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
         if tool_name:
-            cursor = self.conn.execute("""
+            cursor = self.conn.execute(
+                """
                 SELECT * FROM tool_events
                 WHERE tool_name = ? AND timestamp > ?
                 ORDER BY timestamp DESC
                 LIMIT ?
-            """, (tool_name, cutoff, limit))
+            """,
+                (tool_name, cutoff, limit),
+            )
         else:
-            cursor = self.conn.execute("""
+            cursor = self.conn.execute(
+                """
                 SELECT * FROM tool_events
                 WHERE timestamp > ?
                 ORDER BY timestamp DESC
                 LIMIT ?
-            """, (cutoff, limit))
+            """,
+                (cutoff, limit),
+            )
 
         return [dict(row) for row in cursor.fetchall()]
 
@@ -78,7 +88,8 @@ class DashboardData:
         """Get success rate by tool for last N days"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT
                 tool_name,
                 CAST(SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100 as success_rate
@@ -87,9 +98,11 @@ class DashboardData:
             GROUP BY tool_name
             HAVING COUNT(*) > 5
             ORDER BY success_rate ASC
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
-        return {row['tool_name']: row['success_rate'] for row in cursor.fetchall()}
+        return {row["tool_name"]: row["success_rate"] for row in cursor.fetchall()}
 
     # Activity Queries
     # ================
@@ -98,12 +111,15 @@ class DashboardData:
         """Get recent activity events"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT * FROM activity_events
             WHERE timestamp > ?
             ORDER BY timestamp DESC
             LIMIT ?
-        """, (cutoff, limit))
+        """,
+            (cutoff, limit),
+        )
 
         return [dict(row) for row in cursor.fetchall()]
 
@@ -111,7 +127,8 @@ class DashboardData:
         """Get activity counts by event type"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT
                 event_type,
                 COUNT(*) as count
@@ -119,7 +136,9 @@ class DashboardData:
             WHERE timestamp > ?
             GROUP BY event_type
             ORDER BY count DESC
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         return [dict(row) for row in cursor.fetchall()]
 
@@ -127,7 +146,8 @@ class DashboardData:
         """Get activity grouped by hour"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT
                 strftime('%Y-%m-%d %H:00:00', datetime(timestamp, 'unixepoch')) as hour,
                 COUNT(*) as event_count
@@ -135,7 +155,9 @@ class DashboardData:
             WHERE timestamp > ?
             GROUP BY hour
             ORDER BY hour DESC
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         return [dict(row) for row in cursor.fetchall()]
 
@@ -146,12 +168,15 @@ class DashboardData:
         """Get recent routing decisions"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT * FROM routing_events
             WHERE timestamp > ?
             ORDER BY timestamp DESC
             LIMIT ?
-        """, (cutoff, limit))
+        """,
+            (cutoff, limit),
+        )
 
         return [dict(row) for row in cursor.fetchall()]
 
@@ -159,7 +184,8 @@ class DashboardData:
         """Get model usage distribution"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT
                 chosen_model,
                 COUNT(*) as count
@@ -167,35 +193,43 @@ class DashboardData:
             WHERE timestamp > ? AND chosen_model IS NOT NULL
             GROUP BY chosen_model
             ORDER BY count DESC
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
-        return {row['chosen_model']: row['count'] for row in cursor.fetchall()}
+        return {row["chosen_model"]: row["count"] for row in cursor.fetchall()}
 
     def get_avg_dq_score(self, days: int = 7) -> Optional[float]:
         """Get average DQ score"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT AVG(dq_score) as avg_dq
             FROM routing_events
             WHERE timestamp > ? AND dq_score IS NOT NULL
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         result = cursor.fetchone()
-        return result['avg_dq'] if result else None
+        return result["avg_dq"] if result else None
 
     def get_avg_complexity(self, days: int = 7) -> Optional[float]:
         """Get average complexity score"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT AVG(complexity) as avg_complexity
             FROM routing_events
             WHERE timestamp > ? AND complexity IS NOT NULL
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         result = cursor.fetchone()
-        return result['avg_complexity'] if result else None
+        return result["avg_complexity"] if result else None
 
     # Session Queries
     # ===============
@@ -204,12 +238,15 @@ class DashboardData:
         """Get recent session outcomes"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT * FROM session_outcome_events
             WHERE timestamp > ?
             ORDER BY timestamp DESC
             LIMIT ?
-        """, (cutoff, limit))
+        """,
+            (cutoff, limit),
+        )
 
         return [dict(row) for row in cursor.fetchall()]
 
@@ -217,27 +254,33 @@ class DashboardData:
         """Get average session quality score"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT AVG(quality_score) as avg_quality
             FROM session_outcome_events
             WHERE timestamp > ? AND quality_score IS NOT NULL
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         result = cursor.fetchone()
-        return result['avg_quality'] if result else None
+        return result["avg_quality"] if result else None
 
     def get_session_count(self, days: int = 7) -> int:
         """Get total session count"""
         cutoff = int((datetime.now() - timedelta(days=days)).timestamp())
 
-        cursor = self.conn.execute("""
+        cursor = self.conn.execute(
+            """
             SELECT COUNT(DISTINCT session_id) as count
             FROM session_outcome_events
             WHERE timestamp > ? AND session_id IS NOT NULL
-        """, (cutoff,))
+        """,
+            (cutoff,),
+        )
 
         result = cursor.fetchone()
-        return result['count'] if result else 0
+        return result["count"] if result else 0
 
     # Aggregated Queries
     # ==================
@@ -247,7 +290,8 @@ class DashboardData:
         cutoff_ts = int((datetime.now() - timedelta(days=days)).timestamp())
 
         # Tool usage stats
-        tool_cursor = self.conn.execute("""
+        tool_cursor = self.conn.execute(
+            """
             SELECT
                 COUNT(DISTINCT tool_name) as unique_tools,
                 COUNT(*) as total_tool_calls,
@@ -255,52 +299,65 @@ class DashboardData:
                 AVG(duration_ms) as avg_duration
             FROM tool_events
             WHERE timestamp > ?
-        """, (cutoff_ts,))
+        """,
+            (cutoff_ts,),
+        )
         tool_stats = dict(tool_cursor.fetchone())
 
         # Activity stats
-        activity_cursor = self.conn.execute("""
+        activity_cursor = self.conn.execute(
+            """
             SELECT
                 COUNT(*) as total_events,
                 COUNT(DISTINCT event_type) as unique_event_types
             FROM activity_events
             WHERE timestamp > ?
-        """, (cutoff_ts,))
+        """,
+            (cutoff_ts,),
+        )
         activity_stats = dict(activity_cursor.fetchone())
 
         # Routing stats
-        routing_cursor = self.conn.execute("""
+        routing_cursor = self.conn.execute(
+            """
             SELECT
                 COUNT(*) as total_decisions,
                 AVG(dq_score) as avg_dq_score,
                 AVG(complexity) as avg_complexity
             FROM routing_events
             WHERE timestamp > ?
-        """, (cutoff_ts,))
+        """,
+            (cutoff_ts,),
+        )
         routing_stats = dict(routing_cursor.fetchone())
 
         # Session stats
-        session_cursor = self.conn.execute("""
+        session_cursor = self.conn.execute(
+            """
             SELECT
                 COUNT(DISTINCT session_id) as total_sessions,
                 AVG(quality_score) as avg_quality,
                 AVG(message_count) as avg_messages
             FROM session_outcome_events
             WHERE timestamp > ?
-        """, (cutoff_ts,))
+        """,
+            (cutoff_ts,),
+        )
         session_stats = dict(session_cursor.fetchone())
 
         return {
-            'period_days': days,
-            'tool_stats': tool_stats,
-            'activity_stats': activity_stats,
-            'routing_stats': routing_stats,
-            'session_stats': session_stats,
-            'generated_at': datetime.now().isoformat()
+            "period_days": days,
+            "tool_stats": tool_stats,
+            "activity_stats": activity_stats,
+            "routing_stats": routing_stats,
+            "session_stats": session_stats,
+            "generated_at": datetime.now().isoformat(),
         }
+
 
 # CLI Interface
 # =============
+
 
 def main():
     """CLI interface for testing queries"""
@@ -321,15 +378,15 @@ def main():
     days = int(sys.argv[2]) if len(sys.argv) > 2 else 7
 
     with DashboardData() as db:
-        if query_type == 'tool_usage':
+        if query_type == "tool_usage":
             data = db.get_tool_usage_summary(days)
-        elif query_type == 'activity':
+        elif query_type == "activity":
             data = db.get_activity_timeline(days, limit=50)
-        elif query_type == 'routing':
+        elif query_type == "routing":
             data = db.get_routing_decisions(days, limit=50)
-        elif query_type == 'sessions':
+        elif query_type == "sessions":
             data = db.get_session_outcomes(days, limit=50)
-        elif query_type == 'summary':
+        elif query_type == "summary":
             data = db.get_dashboard_summary(days)
         else:
             print(f"Unknown query: {query_type}")
@@ -337,5 +394,6 @@ def main():
 
         print(json.dumps(data, indent=2))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

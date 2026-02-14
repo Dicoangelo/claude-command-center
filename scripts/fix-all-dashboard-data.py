@@ -17,7 +17,6 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
 
 # Import centralized pricing
 sys.path.insert(0, str(Path.home() / ".claude/config"))
@@ -25,11 +24,13 @@ from pricing import ESTIMATES as COSTS_PER_MSG
 from pricing import MONTHLY_RATE_USD, get_model_cost
 
 # Quiet mode for hooks
-QUIET = '--quiet' in sys.argv or '-q' in sys.argv
+QUIET = "--quiet" in sys.argv or "-q" in sys.argv
+
 
 def log(msg: str = "") -> None:
     if not QUIET:
         print(msg)
+
 
 log("=" * 70)
 log("FIX ALL DASHBOARD DATA")
@@ -77,11 +78,11 @@ for transcript in PROJECTS_DIR.glob("**/*.jsonl"):
         has_error = False
         last_outcome = None
 
-        with open(transcript, 'r', errors='ignore') as f:
+        with open(transcript, "r", errors="ignore") as f:
             for line in f:
                 try:
                     entry = json.loads(line)
-                    ts = entry.get('timestamp')
+                    ts = entry.get("timestamp")
 
                     if ts:
                         if session_date is None:
@@ -90,52 +91,54 @@ for transcript in PROJECTS_DIR.glob("**/*.jsonl"):
                         try:
                             hour = int(ts[11:13])
                             session_hours.add(hour)
-                        except:
+                        except Exception:
                             pass
 
-                    if entry.get('type') == 'user':
+                    if entry.get("type") == "user":
                         session_messages += 1
                         # Capture first user message as title/intent
                         if first_user_msg is None:
-                            msg_content = entry.get('message', {})
+                            msg_content = entry.get("message", {})
                             if isinstance(msg_content, dict):
-                                content = msg_content.get('content', '')
+                                content = msg_content.get("content", "")
                             else:
                                 content = str(msg_content)
                             if isinstance(content, list):
-                                content = ' '.join([c.get('text', '') if isinstance(c, dict) else str(c) for c in content])
+                                content = " ".join(
+                                    [c.get("text", "") if isinstance(c, dict) else str(c) for c in content]
+                                )
                             if content and len(content) > 3:
                                 first_user_msg = content[:100]  # First 100 chars
 
-                    if entry.get('type') == 'assistant':
+                    if entry.get("type") == "assistant":
                         session_messages += 1
-                        msg = entry.get('message', {})
-                        model = msg.get('model', '')
+                        msg = entry.get("message", {})
+                        model = msg.get("model", "")
 
-                        if 'opus' in model:
-                            model_counts['opus'] += 1
-                            session_models['opus'] += 1
-                        elif 'sonnet' in model:
-                            model_counts['sonnet'] += 1
-                            session_models['sonnet'] += 1
-                        elif 'haiku' in model:
-                            model_counts['haiku'] += 1
-                            session_models['haiku'] += 1
+                        if "opus" in model:
+                            model_counts["opus"] += 1
+                            session_models["opus"] += 1
+                        elif "sonnet" in model:
+                            model_counts["sonnet"] += 1
+                            session_models["sonnet"] += 1
+                        elif "haiku" in model:
+                            model_counts["haiku"] += 1
+                            session_models["haiku"] += 1
 
-                        content = msg.get('content', [])
+                        content = msg.get("content", [])
                         if isinstance(content, list):
                             for item in content:
-                                if isinstance(item, dict) and item.get('type') == 'tool_use':
-                                    tool_name = item.get('name', 'unknown')
+                                if isinstance(item, dict) and item.get("type") == "tool_use":
+                                    tool_name = item.get("name", "unknown")
                                     tool_counts[tool_name] += 1
                                     session_tools += 1
 
                         # Check for error indicators
-                        stop_reason = msg.get('stopReason', '')
-                        if stop_reason == 'error':
+                        stop_reason = msg.get("stopReason", "")
+                        if stop_reason == "error":
                             has_error = True
 
-                except:
+                except Exception:
                     pass
 
         if session_date:
@@ -155,42 +158,42 @@ for transcript in PROJECTS_DIR.glob("**/*.jsonl"):
                 longest_session = {
                     "messageCount": session_messages,
                     "date": session_date,
-                    "sessionId": str(transcript.name)[:20]
+                    "sessionId": str(transcript.name)[:20],
                 }
 
             # Determine outcome based on session characteristics
             if has_error:
-                outcome = 'error'
+                outcome = "error"
             elif session_messages < 5:
-                outcome = 'abandoned'
+                outcome = "abandoned"
             elif session_tools > 10:
-                outcome = 'success'
+                outcome = "success"
             elif session_messages > 20:
-                outcome = 'success'
+                outcome = "success"
             else:
-                outcome = 'partial'
+                outcome = "partial"
 
             # Calculate model efficiency (cost-weighted: haiku=1.0, sonnet=0.8, opus=0.5)
             total_model_calls = sum(session_models.values()) or 1
             efficiency = (
-                session_models['haiku'] * 1.0 +
-                session_models['sonnet'] * 0.8 +
-                session_models['opus'] * 0.5
+                session_models["haiku"] * 1.0 + session_models["sonnet"] * 0.8 + session_models["opus"] * 0.5
             ) / total_model_calls
 
-            all_sessions.append({
-                "date": session_date,
-                "session_id": str(transcript.stem),
-                "messages": session_messages,
-                "tools": session_tools,
-                "title": first_user_msg[:50] if first_user_msg else None,
-                "intent": first_user_msg[:80] if first_user_msg else None,
-                "outcome": outcome,
-                "model_efficiency": round(efficiency, 2),
-                "models_used": dict(session_models)
-            })
+            all_sessions.append(
+                {
+                    "date": session_date,
+                    "session_id": str(transcript.stem),
+                    "messages": session_messages,
+                    "tools": session_tools,
+                    "title": first_user_msg[:50] if first_user_msg else None,
+                    "intent": first_user_msg[:80] if first_user_msg else None,
+                    "outcome": outcome,
+                    "model_efficiency": round(efficiency, 2),
+                    "models_used": dict(session_models),
+                }
+            )
 
-    except:
+    except Exception:
         pass
 
 log(f"  Sessions: {total_sessions}")
@@ -206,15 +209,15 @@ for transcript in PROJECTS_DIR.glob("**/*.jsonl"):
             for line in f:
                 try:
                     d = json.loads(line)
-                    usage = d.get('message', {}).get('usage', {})
+                    usage = d.get("message", {}).get("usage", {})
                     if usage:
-                        real_tokens["cache_read"] += usage.get('cache_read_input_tokens', 0)
-                        real_tokens["input"] += usage.get('input_tokens', 0)
-                        real_tokens["cache_create"] += usage.get('cache_creation_input_tokens', 0)
-                        real_tokens["output"] += usage.get('output_tokens', 0)
-                except:
+                        real_tokens["cache_read"] += usage.get("cache_read_input_tokens", 0)
+                        real_tokens["input"] += usage.get("input_tokens", 0)
+                        real_tokens["cache_create"] += usage.get("cache_creation_input_tokens", 0)
+                        real_tokens["output"] += usage.get("output_tokens", 0)
+                except Exception:
                     pass
-    except:
+    except Exception:
         pass
 
 log()
@@ -230,28 +233,23 @@ sorted_daily = sorted(daily_stats.items())  # All time, chronological
 
 stats = {
     "version": 1,
-    "lastComputedDate": datetime.now().strftime('%Y-%m-%d'),
+    "lastComputedDate": datetime.now().strftime("%Y-%m-%d"),
     "totalSessions": total_sessions,
     "totalMessages": total_messages,
     "totalTools": total_tools,
     "modelUsage": {
         "opus": {
             # REAL token data from cost-tracking.jsonl (not estimates)
-            "inputTokens": real_tokens["input"] or model_counts['opus'] * 500,
-            "outputTokens": real_tokens["output"] or model_counts['opus'] * 800,
-            "cacheReadInputTokens": real_tokens["cache_read"] or model_counts['opus'] * 19000,
-            "cacheCreationInputTokens": real_tokens["cache_create"] or model_counts['opus'] * 600
+            "inputTokens": real_tokens["input"] or model_counts["opus"] * 500,
+            "outputTokens": real_tokens["output"] or model_counts["opus"] * 800,
+            "cacheReadInputTokens": real_tokens["cache_read"] or model_counts["opus"] * 19000,
+            "cacheCreationInputTokens": real_tokens["cache_create"] or model_counts["opus"] * 600,
         }
     },
     "hourCounts": dict(hour_counts),  # Activity by hour (0-23)
     "longestSession": longest_session,  # Session with most messages
     "dailyActivity": [
-        {
-            "date": d,
-            "messageCount": v["messages"],
-            "sessionCount": v["sessions"],
-            "toolCallCount": v["tools"]
-        }
+        {"date": d, "messageCount": v["messages"], "sessionCount": v["sessions"], "toolCallCount": v["tools"]}
         for d, v in sorted_daily  # Chronological order for charts
     ],
     "dailyModelTokens": [
@@ -259,15 +257,11 @@ stats = {
             "date": d,
             "tokensByModel": {
                 "opus": v["messages"] * 2300  # ~1500 input + 800 output avg
-            }
+            },
         }
         for d, v in sorted_daily  # Chronological order for charts
     ],
-    "totals": {
-        "sessions": total_sessions,
-        "messages": total_messages,
-        "tools": total_tools
-    }
+    "totals": {"sessions": total_sessions, "messages": total_messages, "tools": total_tools},
 }
 (CLAUDE_DIR / "stats-cache.json").write_text(json.dumps(stats, indent=2))
 log("  ✅ Done")
@@ -282,11 +276,30 @@ knowledge_file = MEMORY_DIR / "knowledge.json"
 if not knowledge_file.exists() or knowledge_file.stat().st_size < 50:
     knowledge = {
         "facts": [
-            {"id": 0, "content": f"Total sessions: {total_sessions}", "tags": ["stats"], "timestamp": datetime.now().isoformat()},
-            {"id": 1, "content": f"Total messages: {total_messages}", "tags": ["stats"], "timestamp": datetime.now().isoformat()},
-            {"id": 2, "content": f"Model distribution: Opus {model_counts['opus']}, Sonnet {model_counts['sonnet']}, Haiku {model_counts['haiku']}", "tags": ["models"], "timestamp": datetime.now().isoformat()},
+            {
+                "id": 0,
+                "content": f"Total sessions: {total_sessions}",
+                "tags": ["stats"],
+                "timestamp": datetime.now().isoformat(),
+            },
+            {
+                "id": 1,
+                "content": f"Total messages: {total_messages}",
+                "tags": ["stats"],
+                "timestamp": datetime.now().isoformat(),
+            },
+            {
+                "id": 2,
+                "content": (
+                    f"Model distribution: Opus {model_counts['opus']}, "
+                    f"Sonnet {model_counts['sonnet']}, "
+                    f"Haiku {model_counts['haiku']}"
+                ),
+                "tags": ["models"],
+                "timestamp": datetime.now().isoformat(),
+            },
         ],
-        "updated": datetime.now().isoformat()
+        "updated": datetime.now().isoformat(),
     }
     knowledge_file.write_text(json.dumps(knowledge, indent=2))
 log("  ✅ Done")
@@ -305,30 +318,33 @@ if git_file.exists():
         for line in f:
             try:
                 e = json.loads(line)
-                ts = e.get('ts', 0)
+                ts = e.get("ts", 0)
                 if ts:
-                    day = datetime.fromtimestamp(ts).strftime('%Y-%m-%d')
+                    day = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
                     git_commits[day] += 1
-            except:
+            except Exception:
                 pass
 
 timeline = {
     "generated": datetime.now().isoformat(),
     "days": [
-        (d, {
-            "tools": v["tools"],
-            "sessions": v["sessions"],
-            "messages": v["messages"],
-            "commits": git_commits.get(d, 0)
-        })
+        (
+            d,
+            {
+                "tools": v["tools"],
+                "sessions": v["sessions"],
+                "messages": v["messages"],
+                "commits": git_commits.get(d, 0),
+            },
+        )
         for d, v in sorted(daily_stats.items(), reverse=True)  # All time
     ],
     "totals": {
         "tools": total_tools,
         "sessions": total_sessions,
         "messages": total_messages,
-        "commits": sum(git_commits.values())
-    }
+        "commits": sum(git_commits.values()),
+    },
 }
 (KERNEL_DIR / "activity-timeline.json").write_text(json.dumps(timeline, indent=2))
 log("  ✅ Done")
@@ -345,15 +361,15 @@ total_value = sum(model_counts[m] * COSTS_PER_MSG[m] for m in COSTS_PER_MSG)
 
 sub_data = {
     "totalValue": round(total_value, 2),
-    "opusQueries": model_counts['opus'],
-    "sonnetQueries": model_counts['sonnet'],
-    "haikuQueries": model_counts['haiku'],
+    "opusQueries": model_counts["opus"],
+    "sonnetQueries": model_counts["sonnet"],
+    "haikuQueries": model_counts["haiku"],
     "totalQueries": sum(model_counts.values()),
     "totalSessions": total_sessions,
     "totalMessages": total_messages,
     "monthlySubscription": MONTHLY_RATE_USD,
     "roiMultiplier": round(total_value / MONTHLY_RATE_USD, 1) if total_value > 0 else 0,
-    "lastUpdated": datetime.now().isoformat()
+    "lastUpdated": datetime.now().isoformat(),
 }
 (KERNEL_DIR / "subscription-data.json").write_text(json.dumps(sub_data, indent=2))
 log(f"  ✅ Value: ${total_value:,.0f} ({sub_data['roiMultiplier']}x ROI)")
@@ -384,24 +400,26 @@ if dq_file.exists():
         for line in f:
             try:
                 e = json.loads(line)
-                ts = e.get('ts', 0)
+                ts = e.get("ts", 0)
                 if ts:
-                    entries.append({
-                        "ts": ts,
-                        "query": e.get('query', '')[:50],
-                        "predicted_model": e.get('model', 'sonnet'),
-                        "actual_model": e.get('model', 'sonnet'),
-                        "dq_score": e.get('dqScore', 0.5),
-                        "complexity": e.get('complexity', 0.5),
-                        "correct": True,
-                        "latency_ms": 42
-                    })
-            except:
+                    entries.append(
+                        {
+                            "ts": ts,
+                            "query": e.get("query", "")[:50],
+                            "predicted_model": e.get("model", "sonnet"),
+                            "actual_model": e.get("model", "sonnet"),
+                            "dq_score": e.get("dqScore", 0.5),
+                            "complexity": e.get("complexity", 0.5),
+                            "correct": True,
+                            "latency_ms": 42,
+                        }
+                    )
+            except Exception:
                 pass
 
-with open(routing_file, 'w') as f:
+with open(routing_file, "w") as f:
     for e in entries:
-        f.write(json.dumps(e) + '\n')
+        f.write(json.dumps(e) + "\n")
 log(f"  ✅ {len(entries)} entries")
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -414,15 +432,19 @@ patterns_file = KERNEL_DIR / "detected-patterns.json"
 if not patterns_file.exists() or patterns_file.stat().st_size < 50:
     # Detect patterns from data
     top_tools = tool_counts.most_common(5)
-    dominant_model = model_counts.most_common(1)[0][0] if model_counts else 'sonnet'
+    dominant_model = model_counts.most_common(1)[0][0] if model_counts else "sonnet"
 
     patterns = {
         "patterns": [
-            {"type": "tool_usage", "description": f"Most used tools: {', '.join([t[0] for t in top_tools])}", "confidence": 0.9},
+            {
+                "type": "tool_usage",
+                "description": f"Most used tools: {', '.join([t[0] for t in top_tools])}",
+                "confidence": 0.9,
+            },
             {"type": "model_preference", "description": f"Dominant model: {dominant_model}", "confidence": 0.85},
-            {"type": "session_type", "description": "debugging", "confidence": 0.8}
+            {"type": "session_type", "description": "debugging", "confidence": 0.8},
         ],
-        "lastDetected": datetime.now().isoformat()
+        "lastDetected": datetime.now().isoformat(),
     }
     patterns_file.write_text(json.dumps(patterns, indent=2))
 log("  ✅ Done")
@@ -437,12 +459,7 @@ coevo_file = KERNEL_DIR / "coevo-config.json"
 if coevo_file.exists():
     log("  ✅ Exists")
 else:
-    coevo = {
-        "enabled": True,
-        "autoApply": True,
-        "minConfidence": 0.9,
-        "lastRun": datetime.now().isoformat()
-    }
+    coevo = {"enabled": True, "autoApply": True, "minConfidence": 0.9, "lastRun": datetime.now().isoformat()}
     coevo_file.write_text(json.dumps(coevo, indent=2))
     log("  ✅ Created")
 
@@ -467,13 +484,13 @@ log("STEP 11: Fixing identity.json...")
 identity_file = KERNEL_DIR / "identity.json"
 if identity_file.exists():
     identity = json.loads(identity_file.read_text())
-    identity['statistics'] = {
+    identity["statistics"] = {
         "totalQueries": sum(model_counts.values()),
         "totalSessions": total_sessions,
         "totalMessages": total_messages,
         "totalTools": total_tools,
         "modelBreakdown": dict(model_counts),
-        "lastUpdated": datetime.now().isoformat()
+        "lastUpdated": datetime.now().isoformat(),
     }
     identity_file.write_text(json.dumps(identity, indent=2))
 log("  ✅ Done")
@@ -488,7 +505,7 @@ tool_summary = {
     "totalCalls": sum(tool_counts.values()),
     "uniqueTools": len(tool_counts),
     "topTools": tool_counts.most_common(20),
-    "updated": datetime.now().isoformat()
+    "updated": datetime.now().isoformat(),
 }
 (KERNEL_DIR / "tool-summary.json").write_text(json.dumps(tool_summary, indent=2))
 log(f"  ✅ {tool_summary['totalCalls']} calls")
@@ -501,17 +518,17 @@ log("STEP 13: Fixing cost-summary.json...")
 
 cost_summary = {
     "totalCost": round(total_value, 2),
-    "opusMessages": model_counts['opus'],
-    "sonnetMessages": model_counts['sonnet'],
-    "haikuMessages": model_counts['haiku'],
+    "opusMessages": model_counts["opus"],
+    "sonnetMessages": model_counts["sonnet"],
+    "haikuMessages": model_counts["haiku"],
     "costByModel": {
-        "opus": round(model_counts['opus'] * COSTS_PER_MSG['opus'], 2),
-        "sonnet": round(model_counts['sonnet'] * COSTS_PER_MSG['sonnet'], 2),
-        "haiku": round(model_counts['haiku'] * COSTS_PER_MSG['haiku'], 2)
+        "opus": round(model_counts["opus"] * COSTS_PER_MSG["opus"], 2),
+        "sonnet": round(model_counts["sonnet"] * COSTS_PER_MSG["sonnet"], 2),
+        "haiku": round(model_counts["haiku"] * COSTS_PER_MSG["haiku"], 2),
     },
     "subscription": 200,
     "roiMultiplier": round(total_value / 200, 1),
-    "lastUpdated": datetime.now().isoformat()
+    "lastUpdated": datetime.now().isoformat(),
 }
 (KERNEL_DIR / "cost-summary.json").write_text(json.dumps(cost_summary, indent=2))
 log(f"  ✅ ${total_value:,.2f} total")
@@ -531,31 +548,32 @@ if session_outcomes_file.exists():
         for line in f:
             try:
                 s = json.loads(line)
-                sid = s.get('session_id')
-                if sid and s.get('quality'):
-                    existing_quality[sid] = s.get('quality')
-            except:
+                sid = s.get("session_id")
+                if sid and s.get("quality"):
+                    existing_quality[sid] = s.get("quality")
+            except Exception:
                 pass
+
 
 def estimate_quality(messages: int, tools: int) -> float:
     """Estimate quality from session metrics: 1-5 scale"""
     # Sessions with more meaningful interaction score higher
     msg_score = min(2.5, messages / 100)  # Up to 2.5 points for messages
-    tool_score = min(2.5, tools / 50)     # Up to 2.5 points for tools
+    tool_score = min(2.5, tools / 50)  # Up to 2.5 points for tools
     return round(min(5, max(1, 1 + msg_score + tool_score)), 1)
 
-with open(session_outcomes_file, 'w') as f:
+
+with open(session_outcomes_file, "w") as f:
     for session in all_sessions:
-        sid = session.get('session_id')
+        sid = session.get("session_id")
         # Preserve existing quality from post-session-analyzer, or estimate
-        session['quality'] = existing_quality.get(sid, estimate_quality(
-            session.get('messages', 0),
-            session.get('tools', 0)
-        ))
-        f.write(json.dumps(session) + '\n')
+        session["quality"] = existing_quality.get(
+            sid, estimate_quality(session.get("messages", 0), session.get("tools", 0))
+        )
+        f.write(json.dumps(session) + "\n")
 
 # Count outcomes
-outcome_counts = Counter(s['outcome'] for s in all_sessions)
+outcome_counts = Counter(s["outcome"] for s in all_sessions)
 log(f"  ✅ {len(all_sessions)} sessions: {dict(outcome_counts)}")
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -569,26 +587,26 @@ pack_metrics = {}
 if pack_metrics_file.exists():
     try:
         pack_metrics = json.loads(pack_metrics_file.read_text())
-    except:
+    except Exception:
         pass
 
 # Calculate daily cost/value from session data
 # Group sessions by date and calculate daily costs
 daily_cost_data = defaultdict(lambda: {"sessions": 0, "messages": 0, "opus": 0, "sonnet": 0, "haiku": 0})
 for session in all_sessions:
-    date = session.get('date')
+    date = session.get("date")
     if date:
         daily_cost_data[date]["sessions"] += 1
-        daily_cost_data[date]["messages"] += session.get('messages', 0)
-        models = session.get('models_used', {})
-        daily_cost_data[date]["opus"] += models.get('opus', 0)
-        daily_cost_data[date]["sonnet"] += models.get('sonnet', 0)
-        daily_cost_data[date]["haiku"] += models.get('haiku', 0)
+        daily_cost_data[date]["messages"] += session.get("messages", 0)
+        models = session.get("models_used", {})
+        daily_cost_data[date]["opus"] += models.get("opus", 0)
+        daily_cost_data[date]["sonnet"] += models.get("sonnet", 0)
+        daily_cost_data[date]["haiku"] += models.get("haiku", 0)
 
 # Build daily_trend using real token-level cost_estimate from SQLite daily_stats
 daily_trend = []
 # Query real cost_estimate per date from SQLite (computed with get_model_cost in previous runs)
-import sqlite3 as _sq15
+import sqlite3 as _sq15  # noqa: E402
 
 _db15_path = CLAUDE_DIR / "data" / "claude.db"
 _db15_costs = {}
@@ -597,7 +615,7 @@ if _db15_path.exists():
         _c15 = _sq15.connect(str(_db15_path), timeout=5.0)
         _c15.row_factory = _sq15.Row
         for _r15 in _c15.execute("SELECT date, cost_estimate FROM daily_stats WHERE cost_estimate > 0").fetchall():
-            _db15_costs[_r15['date']] = _r15['cost_estimate']
+            _db15_costs[_r15["date"]] = _r15["cost_estimate"]
         _c15.close()
     except Exception:
         pass
@@ -607,14 +625,20 @@ for date in sorted(daily_cost_data.keys()):
     # Prefer real token-level cost from SQLite, fall back to per-message estimate
     real_cost = _db15_costs.get(date, 0)
     if real_cost == 0 and d["messages"] > 0:
-        real_cost = (d["opus"] * COSTS_PER_MSG["opus"]) + (d["sonnet"] * COSTS_PER_MSG["sonnet"]) + (d["haiku"] * COSTS_PER_MSG["haiku"])
-    daily_trend.append({
-        "date": date,
-        "sessions": d["sessions"],
-        "messages": d["messages"],
-        "token_savings": int(d["messages"] * 1500),
-        "cost_savings": round(real_cost, 2)
-    })
+        real_cost = (
+            (d["opus"] * COSTS_PER_MSG["opus"])
+            + (d["sonnet"] * COSTS_PER_MSG["sonnet"])
+            + (d["haiku"] * COSTS_PER_MSG["haiku"])
+        )
+    daily_trend.append(
+        {
+            "date": date,
+            "sessions": d["sessions"],
+            "messages": d["messages"],
+            "token_savings": int(d["messages"] * 1500),
+            "cost_savings": round(real_cost, 2),
+        }
+    )
 
 # Update pack_metrics with the new daily_trend
 pack_metrics["daily_trend"] = daily_trend
@@ -641,10 +665,12 @@ log("STEP 16: Syncing to SQLite...")
 
 try:
     from datastore import Datastore
+
     db = Datastore()
 
     # Aggregate per-day token data from sessions table
     import sqlite3 as sq_pre
+
     cdb_pre = sq_pre.connect(str(CLAUDE_DIR / "data" / "claude.db"), timeout=5.0)
     cdb_pre.row_factory = sq_pre.Row
     token_rows = cdb_pre.execute("""
@@ -658,45 +684,66 @@ try:
 
     date_tokens = {}
     for r in token_rows:
-        d = r['date']
+        d = r["date"]
         if d not in date_tokens:
             date_tokens[d] = {
-                'opus_messages': 0, 'sonnet_messages': 0, 'haiku_messages': 0,
-                'opus_tokens_in': 0, 'opus_tokens_out': 0, 'opus_cache_read': 0,
-                'sonnet_tokens_in': 0, 'sonnet_tokens_out': 0, 'sonnet_cache_read': 0,
-                'haiku_tokens_in': 0, 'haiku_tokens_out': 0, 'haiku_cache_read': 0,
+                "opus_messages": 0,
+                "sonnet_messages": 0,
+                "haiku_messages": 0,
+                "opus_tokens_in": 0,
+                "opus_tokens_out": 0,
+                "opus_cache_read": 0,
+                "sonnet_tokens_in": 0,
+                "sonnet_tokens_out": 0,
+                "sonnet_cache_read": 0,
+                "haiku_tokens_in": 0,
+                "haiku_tokens_out": 0,
+                "haiku_cache_read": 0,
             }
-        m = r['model'] or 'opus'
-        key = 'opus' if 'opus' in m else ('sonnet' if 'sonnet' in m else ('haiku' if 'haiku' in m else 'opus'))
-        date_tokens[d][f'{key}_messages'] += r['msgs'] or 0
-        date_tokens[d][f'{key}_tokens_in'] += r['tin'] or 0
-        date_tokens[d][f'{key}_tokens_out'] += r['tout'] or 0
-        date_tokens[d][f'{key}_cache_read'] += r['tcache'] or 0
+        m = r["model"] or "opus"
+        key = "opus" if "opus" in m else ("sonnet" if "sonnet" in m else ("haiku" if "haiku" in m else "opus"))
+        date_tokens[d][f"{key}_messages"] += r["msgs"] or 0
+        date_tokens[d][f"{key}_tokens_in"] += r["tin"] or 0
+        date_tokens[d][f"{key}_tokens_out"] += r["tout"] or 0
+        date_tokens[d][f"{key}_cache_read"] += r["tcache"] or 0
 
     # Sync daily stats with token data
     for date_str, day_data in daily_stats.items():
         dt = date_tokens.get(date_str, {})
         db.update_daily_stats(
             date=date_str,
-            opus_messages=dt.get('opus_messages', day_data['messages'] if model_counts['opus'] > model_counts['sonnet'] else 0),
-            sonnet_messages=dt.get('sonnet_messages', day_data['messages'] if model_counts['sonnet'] >= model_counts['opus'] else 0),
-            haiku_messages=dt.get('haiku_messages', 0),
-            opus_tokens_in=dt.get('opus_tokens_in', 0),
-            opus_tokens_out=dt.get('opus_tokens_out', 0),
-            opus_cache_read=dt.get('opus_cache_read', 0),
-            sonnet_tokens_in=dt.get('sonnet_tokens_in', 0),
-            sonnet_tokens_out=dt.get('sonnet_tokens_out', 0),
-            sonnet_cache_read=dt.get('sonnet_cache_read', 0),
-            haiku_tokens_in=dt.get('haiku_tokens_in', 0),
-            haiku_tokens_out=dt.get('haiku_tokens_out', 0),
-            haiku_cache_read=dt.get('haiku_cache_read', 0),
-            session_count=day_data['sessions'],
-            tool_calls=day_data['tools'],
+            opus_messages=dt.get(
+                "opus_messages", day_data["messages"] if model_counts["opus"] > model_counts["sonnet"] else 0
+            ),
+            sonnet_messages=dt.get(
+                "sonnet_messages", day_data["messages"] if model_counts["sonnet"] >= model_counts["opus"] else 0
+            ),
+            haiku_messages=dt.get("haiku_messages", 0),
+            opus_tokens_in=dt.get("opus_tokens_in", 0),
+            opus_tokens_out=dt.get("opus_tokens_out", 0),
+            opus_cache_read=dt.get("opus_cache_read", 0),
+            sonnet_tokens_in=dt.get("sonnet_tokens_in", 0),
+            sonnet_tokens_out=dt.get("sonnet_tokens_out", 0),
+            sonnet_cache_read=dt.get("sonnet_cache_read", 0),
+            haiku_tokens_in=dt.get("haiku_tokens_in", 0),
+            haiku_tokens_out=dt.get("haiku_tokens_out", 0),
+            haiku_cache_read=dt.get("haiku_cache_read", 0),
+            session_count=day_data["sessions"],
+            tool_calls=day_data["tools"],
             cost_estimate=(
-                get_model_cost("opus", dt.get('opus_tokens_in', 0), dt.get('opus_tokens_out', 0), dt.get('opus_cache_read', 0))
-                + get_model_cost("sonnet", dt.get('sonnet_tokens_in', 0), dt.get('sonnet_tokens_out', 0), dt.get('sonnet_cache_read', 0))
-                + get_model_cost("haiku", dt.get('haiku_tokens_in', 0), dt.get('haiku_tokens_out', 0), dt.get('haiku_cache_read', 0))
-            )
+                get_model_cost(
+                    "opus", dt.get("opus_tokens_in", 0), dt.get("opus_tokens_out", 0), dt.get("opus_cache_read", 0)
+                )
+                + get_model_cost(
+                    "sonnet",
+                    dt.get("sonnet_tokens_in", 0),
+                    dt.get("sonnet_tokens_out", 0),
+                    dt.get("sonnet_cache_read", 0),
+                )
+                + get_model_cost(
+                    "haiku", dt.get("haiku_tokens_in", 0), dt.get("haiku_tokens_out", 0), dt.get("haiku_cache_read", 0)
+                )
+            ),
         )
 
     log("  ✅ SQLite daily_stats synced (with token data)")
@@ -704,6 +751,7 @@ try:
     # Backfill dead tables in claude.db directly
     try:
         import sqlite3 as sq
+
         cdb = sq.connect(str(CLAUDE_DIR / "data" / "claude.db"), timeout=5.0)
         cdb.execute("PRAGMA journal_mode=WAL")
         cdb.execute("PRAGMA busy_timeout=5000")
@@ -716,13 +764,16 @@ try:
         for date_str, day_data in daily_stats.items():
             # Distribute activity across hours based on hour_counts
             for hour, hcount in hour_counts.items():
-                cc.execute("""
+                cc.execute(
+                    """
                     INSERT INTO hourly_activity (date, hour, session_count, message_count)
                     VALUES (?, ?, ?, ?)
                     ON CONFLICT(date, hour) DO UPDATE SET
                         session_count = MAX(session_count, excluded.session_count),
                         message_count = MAX(message_count, excluded.message_count)
-                """, (date_str, hour, 0, int(day_data['messages'] * hcount / max(sum(hour_counts.values()), 1))))
+                """,
+                    (date_str, hour, 0, int(day_data["messages"] * hcount / max(sum(hour_counts.values()), 1))),
+                )
 
         # Backfill session_outcome_events from all_sessions
         latest_soe = cc.execute("SELECT MAX(timestamp) FROM session_outcome_events").fetchone()[0] or 0
@@ -730,18 +781,30 @@ try:
         for session in all_sessions:
             # Convert date string to epoch
             try:
-                session_ts = int(datetime.strptime(session['date'], "%Y-%m-%d").timestamp())
-            except:
+                session_ts = int(datetime.strptime(session["date"], "%Y-%m-%d").timestamp())
+            except Exception:
                 continue
             if session_ts > latest_soe:
-                models_used = session.get('models_used', {})
-                primary_model = max(models_used, key=models_used.get) if models_used else 'opus'
-                cc.execute("""
-                    INSERT INTO session_outcome_events (timestamp, session_id, outcome, quality_score, complexity, model_used, cost, message_count)
+                models_used = session.get("models_used", {})
+                primary_model = max(models_used, key=models_used.get) if models_used else "opus"
+                cc.execute(
+                    """
+                    INSERT INTO session_outcome_events
+                    (timestamp, session_id, outcome, quality_score,
+                     complexity, model_used, cost, message_count)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (session_ts, session.get('session_id'), session.get('outcome', 'unknown'),
-                      session.get('quality', 0), session.get('model_efficiency', 0),
-                      primary_model, 0, session.get('messages', 0)))
+                """,
+                    (
+                        session_ts,
+                        session.get("session_id"),
+                        session.get("outcome", "unknown"),
+                        session.get("quality", 0),
+                        session.get("model_efficiency", 0),
+                        primary_model,
+                        0,
+                        session.get("messages", 0),
+                    ),
+                )
                 backfilled_soe += 1
 
         cdb.commit()
@@ -761,9 +824,9 @@ Summary:
   Sessions:     {total_sessions:,}
   Messages:     {total_messages:,}
   Tools:        {total_tools:,}
-  Opus:         {model_counts['opus']:,}
-  Sonnet:       {model_counts['sonnet']:,}
-  Haiku:        {model_counts['haiku']:,}
+  Opus:         {model_counts["opus"]:,}
+  Sonnet:       {model_counts["sonnet"]:,}
+  Haiku:        {model_counts["haiku"]:,}
   Value:        ${total_value:,.0f}
-  ROI:          {total_value/200:.1f}x
+  ROI:          {total_value / 200:.1f}x
 """)

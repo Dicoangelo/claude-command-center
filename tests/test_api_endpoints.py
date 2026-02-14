@@ -5,7 +5,6 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from unittest.mock import patch
 
 import httpx
 import pytest
@@ -16,7 +15,6 @@ SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
 @pytest.fixture(scope="module")
 def _install_check():
     """Verify httpx is available."""
-    import httpx  # noqa: F811
     return True
 
 
@@ -165,8 +163,15 @@ class TestAPIServer:
     def test_all_endpoints_return_json(self):
         """All REST endpoints should return valid JSON."""
         json_endpoints = [
-            "/api/stats", "/api/cost", "/api/routing", "/api/sessions",
-            "/api/tools", "/api/git", "/api/health", "/api/fate", "/api/cognitive",
+            "/api/stats",
+            "/api/cost",
+            "/api/routing",
+            "/api/sessions",
+            "/api/tools",
+            "/api/git",
+            "/api/health",
+            "/api/fate",
+            "/api/cognitive",
         ]
         for endpoint in json_endpoints:
             r = self.get(endpoint)

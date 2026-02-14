@@ -1,13 +1,13 @@
 """Tests for the database backup script."""
 
 import sqlite3
+import sys
 from pathlib import Path
 
 import pytest
 
-import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-from importlib.util import spec_from_file_location, module_from_spec
+from importlib.util import module_from_spec, spec_from_file_location
 
 BACKUP_SCRIPT = Path(__file__).parent.parent / "scripts" / "ccc-backup.py"
 
@@ -43,11 +43,13 @@ class TestBackup:
         dest.mkdir(parents=True, exist_ok=True)
         # Create 5 fake old backups manually
         import time
+
         for i in range(5):
-            p = dest / f"claude-db-2026-02-0{i+1}-120000.db"
+            p = dest / f"claude-db-2026-02-0{i + 1}-120000.db"
             p.write_bytes(b"fake")
             # Stagger mtime so sorting works
             import os
+
             os.utime(p, (time.time() - (5 - i) * 3600, time.time() - (5 - i) * 3600))
         # Now backup — should rotate down to keep=3
         backup_mod.backup_database(tmp_db, dest, keep=3)

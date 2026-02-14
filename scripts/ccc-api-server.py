@@ -44,16 +44,17 @@ sys.path.insert(0, str(CLAUDE_DIR / "config"))
 try:
     from pricing import MONTHLY_RATE_USD, get_model_cost
 except ImportError:
-    get_model_cost = lambda m, i, o, c=0: 0.0
+    def get_model_cost(m, i, o, c=0):
+        return 0.0
     MONTHLY_RATE_USD = 200
 
 # Import memory query engine
 sys.path.insert(0, str(CLAUDE_DIR / "scripts"))
 try:
     import importlib.util
+
     _spec = importlib.util.spec_from_file_location(
-        "memory_query_engine",
-        str(CLAUDE_DIR / "scripts/memory-query-engine.py")
+        "memory_query_engine", str(CLAUDE_DIR / "scripts/memory-query-engine.py")
     )
     memory_engine = importlib.util.module_from_spec(_spec)
     _spec.loader.exec_module(memory_engine)
@@ -65,6 +66,7 @@ except Exception:
 # ═══════════════════════════════════════════════════════════════
 # SSE DATA STREAMER
 # ═══════════════════════════════════════════════════════════════
+
 
 class DataStreamer:
     """Polls SQLite every 3s, detects changes, broadcasts to SSE clients."""
@@ -85,7 +87,7 @@ class DataStreamer:
 
     def broadcast(self, event_type: str, data: Dict[str, Any]) -> None:
         payload = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
-        encoded = payload.encode('utf-8')
+        encoded = payload.encode("utf-8")
         dead = []
         with self.lock:
             for client in self.clients:
@@ -126,16 +128,19 @@ class DataStreamer:
             """).fetchone()
 
             # Today's activity
-            today = datetime.now().strftime('%Y-%m-%d')
-            today_row = conn.execute("""
+            today = datetime.now().strftime("%Y-%m-%d")
+            today_row = conn.execute(
+                """
                 SELECT opus_messages + sonnet_messages + haiku_messages as messages,
                        session_count as sessions, tool_calls as tools,
                        opus_tokens_in + opus_tokens_out + opus_cache_read as tokens
                 FROM daily_stats WHERE date = ?
-            """, (today,)).fetchone()
+            """,
+                (today,),
+            ).fetchone()
 
             # Active sessions (last 5 minutes)
-            five_min_ago = datetime.now().timestamp() - 300
+            datetime.now().timestamp() - 300
             active = conn.execute("""
                 SELECT COUNT(*) as c FROM sessions
                 WHERE ended_at IS NULL OR ended_at > datetime('now', '-5 minutes')
@@ -151,28 +156,32 @@ class DataStreamer:
             conn.close()
 
             return {
-                "totalSessions": row['total_sessions'] or 0,
-                "totalMessages": row['total_messages'] or 0,
-                "totalTools": row['total_tools'] or 0,
+                "totalSessions": row["total_sessions"] or 0,
+                "totalMessages": row["total_messages"] or 0,
+                "totalTools": row["total_tools"] or 0,
                 "tokens": {
-                    "opus_in": trow['opus_in'] or 0,
-                    "opus_out": trow['opus_out'] or 0,
-                    "opus_cache": trow['opus_cache'] or 0,
+                    "opus_in": trow["opus_in"] or 0,
+                    "opus_out": trow["opus_out"] or 0,
+                    "opus_cache": trow["opus_cache"] or 0,
                 },
                 "today": {
-                    "messages": today_row['messages'] if today_row else 0,
-                    "sessions": today_row['sessions'] if today_row else 0,
-                    "tools": today_row['tools'] if today_row else 0,
-                    "tokens": today_row['tokens'] if today_row else 0,
-                } if today_row else {"messages": 0, "sessions": 0, "tools": 0, "tokens": 0},
-                "activeSessions": active['c'] if active else 0,
+                    "messages": today_row["messages"] if today_row else 0,
+                    "sessions": today_row["sessions"] if today_row else 0,
+                    "tools": today_row["tools"] if today_row else 0,
+                    "tokens": today_row["tokens"] if today_row else 0,
+                }
+                if today_row
+                else {"messages": 0, "sessions": 0, "tools": 0, "tokens": 0},
+                "activeSessions": active["c"] if active else 0,
                 "latestSession": {
-                    "id": latest['id'][:12] if latest else None,
-                    "model": latest['model'] if latest else None,
-                    "messages": latest['message_count'] if latest else 0,
-                    "tools": latest['tool_count'] if latest else 0,
-                    "outcome": latest['outcome'] if latest else None,
-                } if latest else None,
+                    "id": latest["id"][:12] if latest else None,
+                    "model": latest["model"] if latest else None,
+                    "messages": latest["message_count"] if latest else 0,
+                    "tools": latest["tool_count"] if latest else 0,
+                    "outcome": latest["outcome"] if latest else None,
+                }
+                if latest
+                else None,
                 "timestamp": datetime.now().isoformat(),
             }
         except Exception as e:
@@ -182,8 +191,9 @@ class DataStreamer:
         """Quick health check."""
         try:
             import subprocess
+
             result = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=3)
-            daemons = len([l for l in result.stdout.split('\n') if 'com.claude' in l])
+            daemons = len([ln for ln in result.stdout.split("\n") if "com.claude" in ln])
         except Exception:
             daemons = 0
 
@@ -219,23 +229,24 @@ class DataStreamer:
                 if has_clients:
                     # Always send stats
                     stats = self._poll_stats()
-                    if self._data_changed('stats', stats):
-                        self.broadcast('stats', stats)
+                    if self._data_changed("stats", stats):
+                        self.broadcast("stats", stats)
 
                     # Health every 15 seconds (every 5th poll)
                     health_counter += 1
                     if health_counter >= 5:
                         health_counter = 0
                         health = self._poll_health()
-                        if self._data_changed('health', health):
-                            self.broadcast('health', health)
+                        if self._data_changed("health", health):
+                            self.broadcast("health", health)
 
                     # Heartbeat to keep connection alive
-                    self.broadcast('heartbeat', {"t": int(time.time())})
+                    self.broadcast("heartbeat", {"t": int(time.time())})
             except Exception:
                 pass
 
             time.sleep(3)
+
 
 # Global streamer instance
 streamer = DataStreamer()
@@ -264,11 +275,21 @@ SSE_CLIENT_JS = """
 
     const indicator = document.createElement('div');
     indicator.id = 'live-status';
-    indicator.style.cssText = 'position:fixed;top:12px;right:16px;display:flex;align-items:center;gap:6px;padding:4px 12px;font-size:0.75rem;cursor:default;z-index:9999;background:rgba(10,12,20,0.85);border:1px solid rgba(0,255,136,0.15);border-radius:20px;backdrop-filter:blur(8px);';
+    indicator.style.cssText = 'position:fixed;top:12px;right:16px;' +
+      'display:flex;align-items:center;gap:6px;padding:4px 12px;' +
+      'font-size:0.75rem;cursor:default;z-index:9999;' +
+      'background:rgba(10,12,20,0.85);' +
+      'border:1px solid rgba(0,255,136,0.15);' +
+      'border-radius:20px;backdrop-filter:blur(8px);';
     indicator.innerHTML = `
-      <span id="live-dot" style="width:8px;height:8px;border-radius:50%;background:#ff4d6a;display:inline-block;transition:background 0.3s;"></span>
-      <span id="live-label" style="color:rgba(255,255,255,0.5);font-family:JetBrains Mono,monospace;">CONNECTING</span>
-      <span id="live-ts" style="color:rgba(255,255,255,0.25);font-family:JetBrains Mono,monospace;font-size:0.65rem;margin-left:4px;"></span>
+      <span id="live-dot" style="width:8px;height:8px;border-radius:50%;
+        background:#ff4d6a;display:inline-block;
+        transition:background 0.3s;"></span>
+      <span id="live-label" style="color:rgba(255,255,255,0.5);
+        font-family:JetBrains Mono,monospace;">CONNECTING</span>
+      <span id="live-ts" style="color:rgba(255,255,255,0.25);
+        font-family:JetBrains Mono,monospace;font-size:0.65rem;
+        margin-left:4px;"></span>
     `;
     document.body.appendChild(indicator);
   }
@@ -412,6 +433,7 @@ SSE_CLIENT_JS = """
 # HTTP HANDLER
 # ═══════════════════════════════════════════════════════════════
 
+
 class CCCAPIHandler(BaseHTTPRequestHandler):
     """API handler with SSE streaming and dashboard serving."""
 
@@ -420,9 +442,9 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
 
     def send_json(self, data: Dict[str, Any], status: int = 200) -> None:
         self.send_response(status)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Cache-Control', 'no-cache')
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-cache")
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
 
@@ -453,19 +475,19 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         params = parse_qs(parsed.query)
 
         routes = {
-            '/dashboard': self.serve_dashboard,
-            '/api/stream': self.serve_sse,
-            '/api/stats': self.get_stats,
-            '/api/cost': self.get_cost,
-            '/api/routing': self.get_routing,
-            '/api/sessions': self.get_sessions,
-            '/api/tools': self.get_tools,
-            '/api/git': self.get_git,
-            '/api/health': self.get_health,
-            '/api/fate': self.get_fate,
-            '/api/cognitive': self.get_cognitive,
-            '/api/memory/stats': self.get_memory_stats,
-            '/': self.redirect_dashboard,
+            "/dashboard": self.serve_dashboard,
+            "/api/stream": self.serve_sse,
+            "/api/stats": self.get_stats,
+            "/api/cost": self.get_cost,
+            "/api/routing": self.get_routing,
+            "/api/sessions": self.get_sessions,
+            "/api/tools": self.get_tools,
+            "/api/git": self.get_git,
+            "/api/health": self.get_health,
+            "/api/fate": self.get_fate,
+            "/api/cognitive": self.get_cognitive,
+            "/api/memory/stats": self.get_memory_stats,
+            "/": self.redirect_dashboard,
         }
 
         handler = routes.get(path)
@@ -478,7 +500,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
 
     def redirect_dashboard(self, params: Dict[str, List[str]]) -> None:
         self.send_response(302)
-        self.send_header('Location', '/dashboard')
+        self.send_header("Location", "/dashboard")
         self.end_headers()
 
     def serve_dashboard(self, params: Dict[str, List[str]]) -> None:
@@ -487,29 +509,29 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             self.send_json({"error": "Dashboard not generated. Run: ccc --no-open"}, 404)
             return
 
-        html = DASHBOARD_HTML.read_text(encoding='utf-8')
+        html = DASHBOARD_HTML.read_text(encoding="utf-8")
 
         # Inject SSE client before closing </body>
-        if '</body>' in html:
-            html = html.replace('</body>', SSE_CLIENT_JS + '\n</body>')
+        if "</body>" in html:
+            html = html.replace("</body>", SSE_CLIENT_JS + "\n</body>")
         else:
             html += SSE_CLIENT_JS
 
         self.send_response(200)
-        self.send_header('Content-Type', 'text/html; charset=utf-8')
-        self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.end_headers()
-        self.wfile.write(html.encode('utf-8'))
+        self.wfile.write(html.encode("utf-8"))
 
     # ─── SSE Stream ───────────────────────────────────────────
 
     def serve_sse(self, params: Dict[str, List[str]]) -> None:
         """Server-Sent Events stream for real-time updates."""
         self.send_response(200)
-        self.send_header('Content-Type', 'text/event-stream')
-        self.send_header('Cache-Control', 'no-cache')
-        self.send_header('Connection', 'keep-alive')
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
 
         # Send initial data burst
@@ -549,22 +571,30 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             conn.row_factory = sqlite3.Row
             row = conn.execute("""
                 SELECT
-                    SUM(opus_tokens_in) as opus_in, SUM(opus_tokens_out) as opus_out, SUM(opus_cache_read) as opus_cache,
-                    SUM(sonnet_tokens_in) as sonnet_in, SUM(sonnet_tokens_out) as sonnet_out, SUM(sonnet_cache_read) as sonnet_cache,
-                    SUM(haiku_tokens_in) as haiku_in, SUM(haiku_tokens_out) as haiku_out, SUM(haiku_cache_read) as haiku_cache,
+                    SUM(opus_tokens_in) as opus_in,
+                    SUM(opus_tokens_out) as opus_out,
+                    SUM(opus_cache_read) as opus_cache,
+                    SUM(sonnet_tokens_in) as sonnet_in,
+                    SUM(sonnet_tokens_out) as sonnet_out,
+                    SUM(sonnet_cache_read) as sonnet_cache,
+                    SUM(haiku_tokens_in) as haiku_in,
+                    SUM(haiku_tokens_out) as haiku_out,
+                    SUM(haiku_cache_read) as haiku_cache,
                     MIN(date) as first_date, COUNT(*) as days_active
                 FROM daily_stats
             """).fetchone()
-            opus_cost = get_model_cost("opus", row['opus_in'] or 0, row['opus_out'] or 0, row['opus_cache'] or 0)
-            sonnet_cost = get_model_cost("sonnet", row['sonnet_in'] or 0, row['sonnet_out'] or 0, row['sonnet_cache'] or 0)
-            haiku_cost = get_model_cost("haiku", row['haiku_in'] or 0, row['haiku_out'] or 0, row['haiku_cache'] or 0)
+            opus_cost = get_model_cost("opus", row["opus_in"] or 0, row["opus_out"] or 0, row["opus_cache"] or 0)
+            sonnet_cost = get_model_cost(
+                "sonnet", row["sonnet_in"] or 0, row["sonnet_out"] or 0, row["sonnet_cache"] or 0
+            )
+            haiku_cost = get_model_cost("haiku", row["haiku_in"] or 0, row["haiku_out"] or 0, row["haiku_cache"] or 0)
             total_value = opus_cost + sonnet_cost + haiku_cost
-            days = row['days_active'] or 1
+            days = row["days_active"] or 1
             months = max(days / 30.0, 1)
             sub_paid = months * MONTHLY_RATE_USD
             # Cache savings: what cache reads would cost at full input price
-            cache_total = (row['opus_cache'] or 0) + (row['sonnet_cache'] or 0) + (row['haiku_cache'] or 0)
-            input_total = (row['opus_in'] or 0) + (row['sonnet_in'] or 0) + (row['haiku_in'] or 0)
+            cache_total = (row["opus_cache"] or 0) + (row["sonnet_cache"] or 0) + (row["haiku_cache"] or 0)
+            input_total = (row["opus_in"] or 0) + (row["sonnet_in"] or 0) + (row["haiku_in"] or 0)
             cache_eff = round(cache_total / max(cache_total + input_total, 1) * 100, 1)
             # Daily cost breakdown (last 30 days)
             daily_rows = conn.execute("""
@@ -575,81 +605,106 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             """).fetchall()
             daily_costs = []
             for d in daily_rows:
-                dc = (get_model_cost("opus", d['opus_tokens_in'] or 0, d['opus_tokens_out'] or 0, d['opus_cache_read'] or 0)
-                    + get_model_cost("sonnet", d['sonnet_tokens_in'] or 0, d['sonnet_tokens_out'] or 0, d['sonnet_cache_read'] or 0)
-                    + get_model_cost("haiku", d['haiku_tokens_in'] or 0, d['haiku_tokens_out'] or 0, d['haiku_cache_read'] or 0))
-                daily_costs.append({"date": d['date'], "cost": round(dc, 2)})
+                dc = (
+                    get_model_cost(
+                        "opus", d["opus_tokens_in"] or 0, d["opus_tokens_out"] or 0, d["opus_cache_read"] or 0
+                    )
+                    + get_model_cost(
+                        "sonnet", d["sonnet_tokens_in"] or 0, d["sonnet_tokens_out"] or 0, d["sonnet_cache_read"] or 0
+                    )
+                    + get_model_cost(
+                        "haiku", d["haiku_tokens_in"] or 0, d["haiku_tokens_out"] or 0, d["haiku_cache_read"] or 0
+                    )
+                )
+                daily_costs.append({"date": d["date"], "cost": round(dc, 2)})
             conn.close()
-            self.send_json({
-                "today": daily_costs[0]['cost'] if daily_costs else 0,
-                "thisWeek": round(sum(d['cost'] for d in daily_costs[:7]), 2),
-                "thisMonth": round(sum(d['cost'] for d in daily_costs[:30]), 2),
-                "savedViaCache": round(total_value - sub_paid, 2) if total_value > sub_paid else 0,
-                "cacheEfficiency": cache_eff,
-                "dailyCosts": daily_costs,
-                "totalValue": round(total_value, 2),
-                "totalSubscriptionPaid": round(sub_paid, 2),
-                "multiplier": round(total_value / sub_paid, 1) if sub_paid > 0 else 0,
-                "rate": MONTHLY_RATE_USD,
-                "ratePeriod": "monthly",
-                "breakdown": {"opus": round(opus_cost, 2), "sonnet": round(sonnet_cost, 2), "haiku": round(haiku_cost, 2)}
-            })
+            self.send_json(
+                {
+                    "today": daily_costs[0]["cost"] if daily_costs else 0,
+                    "thisWeek": round(sum(d["cost"] for d in daily_costs[:7]), 2),
+                    "thisMonth": round(sum(d["cost"] for d in daily_costs[:30]), 2),
+                    "savedViaCache": round(total_value - sub_paid, 2) if total_value > sub_paid else 0,
+                    "cacheEfficiency": cache_eff,
+                    "dailyCosts": daily_costs,
+                    "totalValue": round(total_value, 2),
+                    "totalSubscriptionPaid": round(sub_paid, 2),
+                    "multiplier": round(total_value / sub_paid, 1) if sub_paid > 0 else 0,
+                    "rate": MONTHLY_RATE_USD,
+                    "ratePeriod": "monthly",
+                    "breakdown": {
+                        "opus": round(opus_cost, 2),
+                        "sonnet": round(sonnet_cost, 2),
+                        "haiku": round(haiku_cost, 2),
+                    },
+                }
+            )
         except Exception as e:
             self.send_json({"error": str(e), "today": 0, "thisWeek": 0, "thisMonth": 0, "dailyCosts": []})
 
     def get_routing(self, params: Dict[str, List[str]]) -> None:
-        limit = int(params.get('limit', [100])[0])
+        limit = int(params.get("limit", [100])[0])
         dq_scores = self.load_jsonl(CLAUDE_DIR / "kernel/dq-scores.jsonl", limit)
         routing = self.load_jsonl(CLAUDE_DIR / "data/routing-metrics.jsonl", limit)
         feedback = self.load_jsonl(CLAUDE_DIR / "data/routing-feedback.jsonl", limit)
-        self.send_json({
-            "dq_scores": dq_scores, "routing_metrics": routing,
-            "feedback": feedback, "total_dq": len(dq_scores),
-            "total_routing": len(routing), "total_feedback": len(feedback)
-        })
+        self.send_json(
+            {
+                "dq_scores": dq_scores,
+                "routing_metrics": routing,
+                "feedback": feedback,
+                "total_dq": len(dq_scores),
+                "total_routing": len(routing),
+                "total_feedback": len(feedback),
+            }
+        )
 
     def get_sessions(self, params: Dict[str, List[str]]) -> None:
-        limit = int(params.get('limit', [50])[0])
+        limit = int(params.get("limit", [50])[0])
         sessions = self.load_jsonl(CLAUDE_DIR / "data/session-outcomes.jsonl", limit)
         self.send_json({"sessions": sessions, "count": len(sessions)})
 
     def get_tools(self, params: Dict[str, List[str]]) -> None:
-        limit = int(params.get('limit', [100])[0])
+        limit = int(params.get("limit", [100])[0])
         usage = self.load_jsonl(CLAUDE_DIR / "data/tool-usage.jsonl", limit)
         success = self.load_jsonl(CLAUDE_DIR / "data/tool-success.jsonl", limit)
-        self.send_json({"usage": usage, "success": success,
-                        "total_usage": len(usage), "total_success": len(success)})
+        self.send_json({"usage": usage, "success": success, "total_usage": len(usage), "total_success": len(success)})
 
     def get_git(self, params: Dict[str, List[str]]) -> None:
-        limit = int(params.get('limit', [50])[0])
+        limit = int(params.get("limit", [50])[0])
         activity = self.load_jsonl(CLAUDE_DIR / "data/git-activity.jsonl", limit)
         self.send_json({"activity": activity, "count": len(activity)})
 
     def get_health(self, params: Dict[str, List[str]]) -> None:
         import subprocess
+
         try:
             result = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=5)
-            daemons = [l for l in result.stdout.split('\n') if 'com.claude' in l]
+            daemons = [ln for ln in result.stdout.split("\n") if "com.claude" in ln]
         except Exception:
             daemons = []
         cost_file = CLAUDE_DIR / "kernel/cost-data.json"
         cost_age = (datetime.now().timestamp() - cost_file.stat().st_mtime) / 60 if cost_file.exists() else -1
-        self.send_json({
-            "status": "healthy" if cost_age < 5 else "stale",
-            "daemons_count": len(daemons),
-            "cost_data_age_minutes": round(cost_age, 1),
-            "timestamp": datetime.now().isoformat()
-        })
+        self.send_json(
+            {
+                "status": "healthy" if cost_age < 5 else "stale",
+                "daemons_count": len(daemons),
+                "cost_data_age_minutes": round(cost_age, 1),
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
     def get_fate(self, params: Dict[str, List[str]]) -> None:
-        limit = int(params.get('limit', [50])[0])
+        limit = int(params.get("limit", [50])[0])
         predictions = self.load_jsonl(CLAUDE_DIR / "kernel/cognitive-os/fate-predictions.jsonl", limit)
         correct = sum(1 for p in predictions if p.get("correct"))
         total = len(predictions)
-        self.send_json({
-            "predictions": predictions, "accuracy": round(correct / total * 100, 1) if total else 0,
-            "correct": correct, "total": total
-        })
+        self.send_json(
+            {
+                "predictions": predictions,
+                "accuracy": round(correct / total * 100, 1) if total else 0,
+                "correct": correct,
+                "total": total,
+            }
+        )
 
     def get_cognitive(self, params: Dict[str, List[str]]) -> None:
         state = self.load_json(CLAUDE_DIR / "kernel/cognitive-os/current-state.json")
@@ -672,15 +727,17 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             self.send_json({"error": "Missing 'query' field"}, 400)
             return
         result = memory_engine.run_query(
-            query, source=body.get("source", "all"),
+            query,
+            source=body.get("source", "all"),
             category=body.get("category", "all"),
-            limit=min(int(body.get("limit", 10)), 50), surface="dashboard"
+            limit=min(int(body.get("limit", 10)), 50),
+            surface="dashboard",
         )
         self.send_json(result)
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        content_length = int(self.headers.get('Content-Length', 0))
+        content_length = int(self.headers.get("Content-Length", 0))
         body = {}
         if content_length > 0:
             try:
@@ -689,7 +746,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
                 self.send_json({"error": "Invalid JSON"}, 400)
                 return
 
-        post_routes = {'/api/memory/query': self.post_memory_query}
+        post_routes = {"/api/memory/query": self.post_memory_query}
         handler = post_routes.get(parsed.path)
         if handler:
             handler(body)
@@ -698,9 +755,9 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self) -> None:
         self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
 
@@ -714,7 +771,7 @@ def main() -> None:
     # Start the data streamer background thread
     streamer.start()
 
-    server = ThreadingHTTPServer(('localhost', port), CCCAPIHandler)
+    server = ThreadingHTTPServer(("localhost", port), CCCAPIHandler)
     print(f"CCC Live Server running on http://localhost:{port}")
     print(f"Dashboard: http://localhost:{port}/dashboard")
     print(f"SSE Stream: http://localhost:{port}/api/stream")

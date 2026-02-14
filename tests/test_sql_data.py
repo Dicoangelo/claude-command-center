@@ -140,8 +140,16 @@ def empty_mod(tmp_path, monkeypatch):
 class TestStatsData:
     def test_returns_required_keys(self, mod):
         data = mod.get_stats_data()
-        for key in ("totalSessions", "totalMessages", "totalTools", "modelUsage",
-                     "dailyActivity", "dailyModelTokens", "hourCounts", "longestSession"):
+        for key in (
+            "totalSessions",
+            "totalMessages",
+            "totalTools",
+            "modelUsage",
+            "dailyActivity",
+            "dailyModelTokens",
+            "hourCounts",
+            "longestSession",
+        ):
             assert key in data, f"Missing key: {key}"
 
     def test_totals_sum_correctly(self, mod):
@@ -238,8 +246,14 @@ class TestSessionOutcomesData:
 class TestRoutingData:
     def test_returns_required_keys(self, mod):
         data = mod.get_routing_data()
-        for key in ("totalQueries", "avgDqScore", "modelDistribution", "dailyTrend",
-                     "dqComponents", "complexityByModel"):
+        for key in (
+            "totalQueries",
+            "avgDqScore",
+            "modelDistribution",
+            "dailyTrend",
+            "dqComponents",
+            "complexityByModel",
+        ):
             assert key in data, f"Missing key: {key}"
 
     def test_total_queries(self, mod):
