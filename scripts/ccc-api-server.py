@@ -44,8 +44,10 @@ sys.path.insert(0, str(CLAUDE_DIR / "config"))
 try:
     from pricing import MONTHLY_RATE_USD, get_model_cost
 except ImportError:
+
     def get_model_cost(m, i, o, c=0):
         return 0.0
+
     MONTHLY_RATE_USD = 200
 
 # Import memory query engine

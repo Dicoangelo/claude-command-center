@@ -715,10 +715,7 @@ def main() -> None:
                 '"dailyActivity":[],"dailyModelTokens":[],'
                 '"modelUsage":{},"hourCounts":{}}'
             ),
-            "subscription": (
-                '{"rate":200,"ratePeriod":"monthly",'
-                '"totalValue":0,"multiplier":0}'
-            ),
+            "subscription": ('{"rate":200,"ratePeriod":"monthly","totalValue":0,"multiplier":0}'),
             "outcomes": (
                 '{"sessions":[],"totals":{"total":0,'
                 '"success":0,"abandoned":0,"partial":0,'
@@ -728,14 +725,9 @@ def main() -> None:
                 '"qualityDist":{},"modelOutcomes":{},'
                 '"sizeDist":{},"daily":[]}'
             ),
-            "routing": (
-                '{"totalQueries":0,'
-                '"dataQuality":0.0,"feedbackCount":0}'
-            ),
+            "routing": ('{"totalQueries":0,"dataQuality":0.0,"feedbackCount":0}'),
             "recovery": (
-                '{"stats":{"total":0},"categories":{},'
-                '"outcomes":[],"timeline":[],'
-                '"successByCategory":{},"matrix":[]}'
+                '{"stats":{"total":0},"categories":{},"outcomes":[],"timeline":[],"successByCategory":{},"matrix":[]}'
             ),
         }
         print(defaults.get(mode, "{}"))
