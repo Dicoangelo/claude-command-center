@@ -5,9 +5,9 @@ Processes the files identified by audit-data-sources.py.
 """
 
 import json
+from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
-from collections import Counter, defaultdict
 
 HOME = Path.home()
 CLAUDE_DIR = HOME / ".claude"

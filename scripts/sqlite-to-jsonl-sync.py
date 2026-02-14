@@ -4,10 +4,10 @@ SQLite → JSONL Sync Bridge
 Exports real-time hook data from SQLite to JSONL files for dashboard consumption.
 """
 
-import sqlite3
 import json
-from pathlib import Path
+import sqlite3
 from datetime import datetime
+from pathlib import Path
 
 HOME = Path.home()
 DB_PATH = HOME / ".agent-core" / "storage" / "antigravity.db"

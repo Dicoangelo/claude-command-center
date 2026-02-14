@@ -15,12 +15,11 @@ Runs as daemon, integrates with watchdog and self-heal.
 import json
 import sqlite3
 import subprocess
-import hashlib
 import sys
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List
 from zoneinfo import ZoneInfo
 
 HOME = Path.home()

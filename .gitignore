@@ -9,9 +9,21 @@ logs/
 # Cache
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environment
+.venv/
+
+# Coverage
+htmlcov/
+.coverage
 
 # OS
 .DS_Store
 
 # Generated HTML (can be regenerated)
 # dashboard/claude-command-center.html
+
+# Ralph TUI output
+.ralph-output/

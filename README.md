@@ -9,7 +9,9 @@
 [![Metaventions AI](https://img.shields.io/badge/Metaventions_AI-Command_Center-00ff88?style=for-the-badge&labelColor=0d1117)](https://metaventionsai.com)
 [![Author](https://img.shields.io/badge/Dicoangelo-Infrastructure-00ff88?style=for-the-badge&logo=github&labelColor=0d1117)](https://github.com/Dicoangelo)
 [![Status](https://img.shields.io/badge/Status-Live_SSE-00ff88?style=for-the-badge&labelColor=0d1117)](http://localhost:8766/dashboard)
-[![Python](https://img.shields.io/badge/Python-3.10+-00ff88?style=for-the-badge&logo=python&labelColor=0d1117)](https://python.org)
+[![Python](https://img.shields.io/badge/Python-3.12+-00ff88?style=for-the-badge&logo=python&labelColor=0d1117)](https://python.org)
+[![CI](https://img.shields.io/github/actions/workflow/status/Dicoangelo/claude-command-center/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=0d1117&color=00ff88)](https://github.com/Dicoangelo/claude-command-center/actions)
+[![Tests](https://img.shields.io/badge/Tests-42_passing-00ff88?style=for-the-badge&labelColor=0d1117)](tests/)
 
 <br/>
 
@@ -461,6 +463,48 @@ flowchart LR
 
 <br/>
 
+## Setup
+
+<details>
+<summary><b>Full installation from a fresh clone</b></summary>
+
+<br/>
+
+**Prerequisites:** Python 3.12+, macOS (for LaunchAgent), SQLite 3
+
+```bash
+# 1. Clone
+git clone https://github.com/Dicoangelo/claude-command-center.git
+cd claude-command-center
+
+# 2. Install dev dependencies
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e '.[dev]'
+
+# 3. Create symlinks (scripts → ~/.claude/scripts/)
+for f in scripts/ccc-*.py scripts/ccc-*.sh; do
+  ln -sf "$(pwd)/$f" ~/.claude/scripts/$(basename "$f")
+done
+
+# 4. Initialize the database
+sqlite3 ~/.claude/data/claude.db < config/schema.sql
+
+# 5. Generate the dashboard
+make generate
+
+# 6. Start the server
+make serve
+# → http://localhost:8766/dashboard
+
+# 7. (Optional) Install LaunchAgent for always-on mode
+cp deploy/com.claude.api-server.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.claude.api-server.plist
+```
+
+</details>
+
+<br/>
+
 ## Quick Start
 
 ```bash
@@ -475,6 +519,17 @@ python3 scripts/ccc-api-server.py --port 8766
 
 # Health check
 curl http://localhost:8766/api/health
+```
+
+### Development
+
+```bash
+make help        # Show all targets
+make test        # Run test suite (42 tests)
+make lint        # Lint with ruff
+make typecheck   # Type check with mypy
+make backup      # Backup SQLite database
+make all         # Lint + format + typecheck + test
 ```
 
 ### API Endpoints
@@ -544,7 +599,10 @@ python3 scripts/ccc-intelligence-layer.py
 | 🚀 | `scripts/ccc-bootstrap.sh` | 1K | Daemon bootstrap |
 | 📋 | `scripts/ccc-status.sh` | 3K | Quick health check |
 | 💾 | `config/datastore.py` | 16K | SQLite ORM layer |
+| 📐 | `config/schema.sql` | 14K | Database schema (20 tables, 42 indexes, 6 views) |
+| 💿 | `scripts/ccc-backup.py` | 3K | SQLite backup with rotation |
 | 🔧 | `deploy/com.claude.api-server.plist` | <1K | LaunchAgent daemon config |
+| 🧪 | `tests/` | 12K | 42 tests (API, datastore, backup) |
 
 <br/>
 
@@ -611,6 +669,72 @@ curl http://localhost:8766/api/health
 
 <br/>
 
+## Troubleshooting
+
+<details>
+<summary><b>Server won't start</b></summary>
+
+Port 8766 may be in use. Kill the stale process and retry:
+```bash
+lsof -ti:8766 | xargs kill -9
+python3 scripts/ccc-api-server.py
+```
+</details>
+
+<details>
+<summary><b>Dashboard shows stale data</b></summary>
+
+Regenerate from SQLite:
+```bash
+make fix-data    # Scan transcripts → SQLite
+make generate    # Regenerate HTML from SQLite
+```
+</details>
+
+<details>
+<summary><b>SSE not connecting (LIVE indicator stays yellow/red)</b></summary>
+
+1. Verify the server is running: `curl http://localhost:8766/api/health`
+2. Check browser console for CORS errors
+3. SSE only works over HTTP — opening the HTML file directly (`file://`) shows STATIC mode
+</details>
+
+<details>
+<summary><b>ROI numbers look wrong</b></summary>
+
+Verify pricing matches Anthropic's current rates:
+```bash
+python3 -c "from pricing import PRICING; print(PRICING)"
+# Should show: opus input=$5/MTok, output=$25/MTok, cache=$0.50/MTok
+```
+If wrong, update `~/.claude/config/pricing.py`.
+</details>
+
+<details>
+<summary><b>LaunchAgent not starting</b></summary>
+
+```bash
+# Unload and reload
+launchctl unload ~/Library/LaunchAgents/com.claude.api-server.plist
+launchctl load ~/Library/LaunchAgents/com.claude.api-server.plist
+
+# Check logs
+tail -20 /tmp/ccc-api-server.log
+```
+</details>
+
+<details>
+<summary><b>Database locked</b></summary>
+
+SQLite WAL mode supports concurrent reads but only one writer. Check for stale connections:
+```bash
+fuser ~/.claude/data/claude.db 2>/dev/null
+# Kill stale processes if needed
+```
+</details>
+
+<br/>
+
 <details>
 <summary><b>🤖 Build Log</b> (click to expand)</summary>
 
@@ -618,6 +742,8 @@ curl http://localhost:8766/api/health
 
 | Date | Action | Outcome |
 |------|--------|---------|
+| 2026-02-14 | Engineering hardening | 42 tests, CI/CD, pyproject.toml, schema.sql, Makefile, type hints, backup script |
+| 2026-02-14 | ROI fix + UI polish | Cost tab pricing fix, live /api/cost, nav overflow, text clamp |
 | 2026-02-13 | Cost model overhaul | Token-level pricing ($200/mo sub), symlink consolidation, README accuracy |
 | 2026-02-12 | Live SSE streaming | Real-time dashboard with 3s updates, LIVE indicator |
 | 2026-02-12 | Token pipeline fix | Backfilled daily_stats from sessions table (79 rows) |

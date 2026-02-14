@@ -12,12 +12,11 @@ Connects the autonomous brain to actionable predictions:
 """
 
 import json
-import sqlite3
-from datetime import datetime, timedelta
-from pathlib import Path
 from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List
 from zoneinfo import ZoneInfo
-from typing import Dict, List, Tuple, Optional
 
 LOCAL_TZ = ZoneInfo("America/New_York")
 HOME = Path.home()

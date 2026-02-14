@@ -11,12 +11,12 @@ Usage:
     stats = db.get_daily_stats(days=30)
 """
 
-import sqlite3
 import json
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Any
+import sqlite3
 from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional
 
 DB_PATH = Path.home() / ".claude/data/claude.db"
 SCHEMA_PATH = Path.home() / ".claude/data/schema.sql"

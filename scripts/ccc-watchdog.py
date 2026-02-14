@@ -15,7 +15,6 @@ This creates a self-healing loop that can never fully die.
 """
 
 import subprocess
-import json
 import sys
 from datetime import datetime
 from pathlib import Path

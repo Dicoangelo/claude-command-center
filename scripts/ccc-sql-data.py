@@ -17,18 +17,19 @@ Usage:
 import json
 import sqlite3
 import sys
-from datetime import datetime, timedelta
-from pathlib import Path
 from collections import Counter, defaultdict
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, List
 
 sys.path.insert(0, str(Path.home() / ".claude/config"))
-from pricing import ESTIMATES as COSTS_PER_MSG, PRICING, MONTHLY_RATE_USD, get_model_cost
+from pricing import MONTHLY_RATE_USD, get_model_cost
 
 DB_PATH = Path.home() / ".claude/data/claude.db"
 HOME = Path.home()
 
 
-def get_db():
+def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH), timeout=5.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
@@ -36,7 +37,7 @@ def get_db():
     return conn
 
 
-def get_stats_data():
+def get_stats_data() -> Dict[str, Any]:
     """Generate __STATS_DATA__ from SQLite (replaces stats-cache.json)."""
     conn = get_db()
 
@@ -171,7 +172,7 @@ def get_stats_data():
     }
 
 
-def get_subscription_data():
+def get_subscription_data() -> Dict[str, Any]:
     """Generate __SUBSCRIPTION_DATA__ from SQLite using real token-level API pricing."""
     conn = get_db()
 
@@ -224,7 +225,7 @@ def get_subscription_data():
     }
 
 
-def get_session_outcomes_data():
+def get_session_outcomes_data() -> Dict[str, Any]:
     """Generate __SESSION_OUTCOMES_DATA__ from SQLite (replaces session-outcomes.jsonl)."""
     conn = get_db()
 
@@ -371,7 +372,7 @@ def get_session_outcomes_data():
     }
 
 
-def get_routing_data():
+def get_routing_data() -> Dict[str, Any]:
     """Generate __ROUTING_DATA__ from SQLite (replaces dq-scores.jsonl reads)."""
     conn = get_db()
 
@@ -525,7 +526,7 @@ def get_routing_data():
     }
 
 
-def get_recovery_data():
+def get_recovery_data() -> Dict[str, Any]:
     """Generate __RECOVERY_DATA__ from SQLite (replaces recovery-outcomes.jsonl)."""
     conn = get_db()
 
@@ -622,7 +623,7 @@ def get_recovery_data():
     }
 
 
-def main():
+def main() -> None:
     if len(sys.argv) < 2:
         print("Usage: ccc-sql-data.py <stats|subscription|outcomes|routing|recovery|all>")
         sys.exit(1)

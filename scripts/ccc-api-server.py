@@ -21,16 +21,17 @@ Endpoints:
 Run: python3 ccc-api-server.py [--port 8766]
 """
 
-from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+import hashlib
 import json
-import sys
 import sqlite3
+import sys
 import threading
 import time
-import hashlib
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from typing import Any, Dict, List
+from urllib.parse import parse_qs, urlparse
 
 HOME = Path.home()
 CLAUDE_DIR = HOME / ".claude"
@@ -41,7 +42,7 @@ PORT = 8766
 # Import pricing config
 sys.path.insert(0, str(CLAUDE_DIR / "config"))
 try:
-    from pricing import get_model_cost, MONTHLY_RATE_USD
+    from pricing import MONTHLY_RATE_USD, get_model_cost
 except ImportError:
     get_model_cost = lambda m, i, o, c=0: 0.0
     MONTHLY_RATE_USD = 200
@@ -68,21 +69,21 @@ except Exception:
 class DataStreamer:
     """Polls SQLite every 3s, detects changes, broadcasts to SSE clients."""
 
-    def __init__(self):
-        self.clients = []
-        self.lock = threading.Lock()
-        self.last_hash = {}
-        self.running = False
+    def __init__(self) -> None:
+        self.clients: List[Any] = []
+        self.lock: threading.Lock = threading.Lock()
+        self.last_hash: Dict[str, str] = {}
+        self.running: bool = False
 
-    def add_client(self, wfile):
+    def add_client(self, wfile: Any) -> None:
         with self.lock:
             self.clients.append(wfile)
 
-    def remove_client(self, wfile):
+    def remove_client(self, wfile: Any) -> None:
         with self.lock:
             self.clients = [c for c in self.clients if c is not wfile]
 
-    def broadcast(self, event_type, data):
+    def broadcast(self, event_type: str, data: Dict[str, Any]) -> None:
         payload = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
         encoded = payload.encode('utf-8')
         dead = []
@@ -96,14 +97,14 @@ class DataStreamer:
             for d in dead:
                 self.clients = [c for c in self.clients if c is not d]
 
-    def _get_db(self):
+    def _get_db(self) -> sqlite3.Connection:
         conn = sqlite3.connect(str(DB_PATH), timeout=3.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=3000")
         return conn
 
-    def _poll_stats(self):
+    def _poll_stats(self) -> Dict[str, Any]:
         """Get current stats snapshot from SQLite."""
         try:
             conn = self._get_db()
@@ -177,7 +178,7 @@ class DataStreamer:
         except Exception as e:
             return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
-    def _poll_health(self):
+    def _poll_health(self) -> Dict[str, Any]:
         """Quick health check."""
         try:
             import subprocess
@@ -191,7 +192,7 @@ class DataStreamer:
             "timestamp": datetime.now().isoformat(),
         }
 
-    def _data_changed(self, key, data):
+    def _data_changed(self, key: str, data: Dict[str, Any]) -> bool:
         """Check if data changed since last poll."""
         h = hashlib.md5(json.dumps(data, sort_keys=True).encode()).hexdigest()
         if self.last_hash.get(key) != h:
@@ -199,7 +200,7 @@ class DataStreamer:
             return True
         return False
 
-    def start(self):
+    def start(self) -> None:
         """Start the background polling thread."""
         if self.running:
             return
@@ -207,7 +208,7 @@ class DataStreamer:
         t = threading.Thread(target=self._run, daemon=True)
         t.start()
 
-    def _run(self):
+    def _run(self) -> None:
         """Main polling loop."""
         health_counter = 0
         while self.running:
@@ -414,10 +415,10 @@ SSE_CLIENT_JS = """
 class CCCAPIHandler(BaseHTTPRequestHandler):
     """API handler with SSE streaming and dashboard serving."""
 
-    def log_message(self, format, *args):
+    def log_message(self, format: str, *args: Any) -> None:
         pass
 
-    def send_json(self, data, status=200):
+    def send_json(self, data: Dict[str, Any], status: int = 200) -> None:
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -425,14 +426,14 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
 
-    def load_json(self, path):
+    def load_json(self, path: Path) -> Dict[str, Any]:
         try:
             with open(path) as f:
                 return json.load(f)
         except Exception:
             return {}
 
-    def load_jsonl(self, path, limit=100):
+    def load_jsonl(self, path: Path, limit: int = 100) -> List[Dict[str, Any]]:
         entries = []
         try:
             with open(path) as f:
@@ -446,7 +447,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         except Exception:
             return []
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
         params = parse_qs(parsed.query)
@@ -475,12 +476,12 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
 
     # ─── Dashboard Serving ────────────────────────────────────
 
-    def redirect_dashboard(self, params):
+    def redirect_dashboard(self, params: Dict[str, List[str]]) -> None:
         self.send_response(302)
         self.send_header('Location', '/dashboard')
         self.end_headers()
 
-    def serve_dashboard(self, params):
+    def serve_dashboard(self, params: Dict[str, List[str]]) -> None:
         """Serve dashboard HTML with live SSE client injected."""
         if not DASHBOARD_HTML.exists():
             self.send_json({"error": "Dashboard not generated. Run: ccc --no-open"}, 404)
@@ -502,7 +503,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
 
     # ─── SSE Stream ───────────────────────────────────────────
 
-    def serve_sse(self, params):
+    def serve_sse(self, params: Dict[str, List[str]]) -> None:
         """Server-Sent Events stream for real-time updates."""
         self.send_response(200)
         self.send_header('Content-Type', 'text/event-stream')
@@ -537,11 +538,11 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
 
     # ─── REST Endpoints (unchanged) ──────────────────────────
 
-    def get_stats(self, params):
+    def get_stats(self, params: Dict[str, List[str]]) -> None:
         data = self.load_json(CLAUDE_DIR / "stats-cache.json")
         self.send_json(data)
 
-    def get_cost(self, params):
+    def get_cost(self, params: Dict[str, List[str]]) -> None:
         """Compute cost data live from SQLite using token-level pricing."""
         try:
             conn = sqlite3.connect(str(DB_PATH), timeout=5)
@@ -596,7 +597,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json({"error": str(e), "today": 0, "thisWeek": 0, "thisMonth": 0, "dailyCosts": []})
 
-    def get_routing(self, params):
+    def get_routing(self, params: Dict[str, List[str]]) -> None:
         limit = int(params.get('limit', [100])[0])
         dq_scores = self.load_jsonl(CLAUDE_DIR / "kernel/dq-scores.jsonl", limit)
         routing = self.load_jsonl(CLAUDE_DIR / "data/routing-metrics.jsonl", limit)
@@ -607,24 +608,24 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             "total_routing": len(routing), "total_feedback": len(feedback)
         })
 
-    def get_sessions(self, params):
+    def get_sessions(self, params: Dict[str, List[str]]) -> None:
         limit = int(params.get('limit', [50])[0])
         sessions = self.load_jsonl(CLAUDE_DIR / "data/session-outcomes.jsonl", limit)
         self.send_json({"sessions": sessions, "count": len(sessions)})
 
-    def get_tools(self, params):
+    def get_tools(self, params: Dict[str, List[str]]) -> None:
         limit = int(params.get('limit', [100])[0])
         usage = self.load_jsonl(CLAUDE_DIR / "data/tool-usage.jsonl", limit)
         success = self.load_jsonl(CLAUDE_DIR / "data/tool-success.jsonl", limit)
         self.send_json({"usage": usage, "success": success,
                         "total_usage": len(usage), "total_success": len(success)})
 
-    def get_git(self, params):
+    def get_git(self, params: Dict[str, List[str]]) -> None:
         limit = int(params.get('limit', [50])[0])
         activity = self.load_jsonl(CLAUDE_DIR / "data/git-activity.jsonl", limit)
         self.send_json({"activity": activity, "count": len(activity)})
 
-    def get_health(self, params):
+    def get_health(self, params: Dict[str, List[str]]) -> None:
         import subprocess
         try:
             result = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=5)
@@ -640,7 +641,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             "timestamp": datetime.now().isoformat()
         })
 
-    def get_fate(self, params):
+    def get_fate(self, params: Dict[str, List[str]]) -> None:
         limit = int(params.get('limit', [50])[0])
         predictions = self.load_jsonl(CLAUDE_DIR / "kernel/cognitive-os/fate-predictions.jsonl", limit)
         correct = sum(1 for p in predictions if p.get("correct"))
@@ -650,19 +651,19 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             "correct": correct, "total": total
         })
 
-    def get_cognitive(self, params):
+    def get_cognitive(self, params: Dict[str, List[str]]) -> None:
         state = self.load_json(CLAUDE_DIR / "kernel/cognitive-os/current-state.json")
         flow = self.load_json(CLAUDE_DIR / "kernel/cognitive-os/flow-state.json")
         weekly = self.load_json(CLAUDE_DIR / "kernel/cognitive-os/weekly-energy.json")
         self.send_json({"current_state": state, "flow_state": flow, "weekly_energy": weekly})
 
-    def get_memory_stats(self, params):
+    def get_memory_stats(self, params: Dict[str, List[str]]) -> None:
         if not MEMORY_AVAILABLE:
             self.send_json({"error": "Memory engine not available"}, 503)
             return
         self.send_json(memory_engine.get_stats())
 
-    def post_memory_query(self, body):
+    def post_memory_query(self, body: Dict[str, Any]) -> None:
         if not MEMORY_AVAILABLE:
             self.send_json({"error": "Memory engine not available"}, 503)
             return
@@ -677,7 +678,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         )
         self.send_json(result)
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         parsed = urlparse(self.path)
         content_length = int(self.headers.get('Content-Length', 0))
         body = {}
@@ -695,7 +696,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         else:
             self.send_json({"error": "Not found"}, 404)
 
-    def do_OPTIONS(self):
+    def do_OPTIONS(self) -> None:
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -703,7 +704,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
-def main():
+def main() -> None:
     port = PORT
     if "--port" in sys.argv:
         idx = sys.argv.index("--port")

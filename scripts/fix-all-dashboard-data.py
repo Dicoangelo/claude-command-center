@@ -13,20 +13,21 @@ JSON files written here are for backward compatibility only.
 """
 
 import json
-import os
 import sys
-from datetime import datetime, timedelta
+from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
-from collections import defaultdict, Counter
+from typing import Dict, Any
 
 # Import centralized pricing
 sys.path.insert(0, str(Path.home() / ".claude/config"))
-from pricing import ESTIMATES as COSTS_PER_MSG, VERSION as PRICING_VERSION, get_model_cost, MONTHLY_RATE_USD
+from pricing import ESTIMATES as COSTS_PER_MSG
+from pricing import MONTHLY_RATE_USD, get_model_cost
 
 # Quiet mode for hooks
 QUIET = '--quiet' in sys.argv or '-q' in sys.argv
 
-def log(msg=""):
+def log(msg: str = "") -> None:
     if not QUIET:
         print(msg)
 
@@ -536,7 +537,7 @@ if session_outcomes_file.exists():
             except:
                 pass
 
-def estimate_quality(messages, tools):
+def estimate_quality(messages: int, tools: int) -> float:
     """Estimate quality from session metrics: 1-5 scale"""
     # Sessions with more meaningful interaction score higher
     msg_score = min(2.5, messages / 100)  # Up to 2.5 points for messages
@@ -588,6 +589,7 @@ for session in all_sessions:
 daily_trend = []
 # Query real cost_estimate per date from SQLite (computed with get_model_cost in previous runs)
 import sqlite3 as _sq15
+
 _db15_path = CLAUDE_DIR / "data" / "claude.db"
 _db15_costs = {}
 if _db15_path.exists():

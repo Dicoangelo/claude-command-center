@@ -26,14 +26,13 @@ Exit codes:
 """
 
 import json
+import os
 import sqlite3
 import subprocess
 import sys
-import os
-import re
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 # ============================================================================
@@ -105,7 +104,7 @@ class Colors:
     RESET = "\033[0m"
 
 
-def log(msg: str, level: str = "INFO", color: str = None):
+def log(msg: str, level: str = "INFO", color: Optional[str] = None) -> None:
     """Log with timestamp and optional color."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     colors = {
@@ -187,28 +186,28 @@ def file_age_hours(filepath: Path) -> float:
 
 class HealthCheck:
     """Individual health check result."""
-    def __init__(self, name: str, category: str):
+    def __init__(self, name: str, category: str) -> None:
         self.name = name
         self.category = category
         self.status = "unknown"  # ok, warn, error
         self.message = ""
         self.can_fix = False
-        self.fix_action = None
-        self.details = {}
+        self.fix_action: Optional[str] = None
+        self.details: Dict[str, Any] = {}
 
-    def ok(self, msg: str = "Healthy"):
+    def ok(self, msg: str = "Healthy") -> 'HealthCheck':
         self.status = "ok"
         self.message = msg
         return self
 
-    def warn(self, msg: str, can_fix: bool = False, fix_action: str = None):
+    def warn(self, msg: str, can_fix: bool = False, fix_action: Optional[str] = None) -> 'HealthCheck':
         self.status = "warn"
         self.message = msg
         self.can_fix = can_fix
         self.fix_action = fix_action
         return self
 
-    def error(self, msg: str, can_fix: bool = False, fix_action: str = None):
+    def error(self, msg: str, can_fix: bool = False, fix_action: Optional[str] = None) -> 'HealthCheck':
         self.status = "error"
         self.message = msg
         self.can_fix = can_fix
@@ -728,7 +727,7 @@ def fix_kill_stale_processes() -> Tuple[bool, str]:
         return False, f"Error: {e}"
 
 
-def log_learning(fix_name: str, issue: str, solution: str, category: str = "self-heal"):
+def log_learning(fix_name: str, issue: str, solution: str, category: str = "self-heal") -> None:
     """Log a learning to supermemory when a fix is applied."""
     try:
         conn = sqlite3.connect(str(MEMORY_DB))
@@ -800,13 +799,13 @@ def fix_run_dashboard_generator() -> Tuple[bool, str]:
 class SelfHealingEngine:
     """The self-healing engine that orchestrates all checks and fixes."""
 
-    def __init__(self, auto_fix: bool = False, verbose: bool = True):
+    def __init__(self, auto_fix: bool = False, verbose: bool = True) -> None:
         self.auto_fix = auto_fix
         self.verbose = verbose
         self.checks: List[HealthCheck] = []
         self.fixes_applied: List[Tuple[str, bool, str]] = []
 
-    def run_all_checks(self):
+    def run_all_checks(self) -> None:
         """Run all health checks."""
 
         # 1. Daemon checks (the root cause of most issues)
@@ -862,7 +861,7 @@ class SelfHealingEngine:
         self.checks.append(check_log_sizes())
         self.checks.append(check_stale_claude_processes())
 
-    def apply_fixes(self):
+    def apply_fixes(self) -> None:
         """Apply fixes for issues that can be auto-fixed."""
         fixable = [c for c in self.checks if c.status in ('warn', 'error') and c.can_fix]
 
@@ -941,7 +940,7 @@ class SelfHealingEngine:
             ],
         }
 
-    def print_summary(self):
+    def print_summary(self) -> None:
         """Print a formatted summary."""
         report = self.report()
 
@@ -999,7 +998,7 @@ class SelfHealingEngine:
         print(f"\n{'='*60}\n")
 
 
-def evolve_from_patterns():
+def evolve_from_patterns() -> None:
     """Analyze recent sessions to discover new patterns and update thresholds."""
     log("Analyzing recent patterns for evolution...", "INFO")
 
@@ -1035,7 +1034,7 @@ def evolve_from_patterns():
     log("Evolution complete - patterns analyzed", "OK")
 
 
-def main():
+def main() -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
