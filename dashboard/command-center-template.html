@@ -3340,6 +3340,23 @@
           </div>
         </div>
       </div>
+
+      <!-- Expertise Routing Heatmap -->
+      <div class="charts-grid" style="margin-top:1rem;">
+        <div class="card" style="grid-column:span 2;">
+          <div class="card-header">
+            <h3>Expertise Routing Heatmap</h3>
+            <span class="card-badge" id="taExpertiseBadge">Loading...</span>
+          </div>
+          <div id="expertiseHeatmap" style="padding:1rem;"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>Complexity Distribution</h3>
+          </div>
+          <div id="expertiseComplexity" style="padding:1rem;"></div>
+        </div>
+      </div>
     </div>
 
     <!-- SUPERMEMORY TAB -->
@@ -8666,15 +8683,120 @@
       el('velocityFieldTime', data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : '—');
     }
 
-    // Lazy-load velocity data when tab becomes active
+    // ─── Live Tool Analytics (fetches from /api/tools) ──────────
+    let _liveToolsLoaded = false;
+    async function loadLiveToolAnalytics() {
+      if (_liveToolsLoaded) return;
+      try {
+        const r = await fetch('/api/tools?days=30');
+        const data = await r.json();
+        if (data.error_note) return;
+        const t = data.totals || {};
+        const usage = data.usage || [];
+        const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+        el('taTotalCalls', formatNumber(t.total_events || 0));
+        el('taUniqueTools', t.unique_tools || 0);
+        el('taSuccessRate', (t.overall_success_rate || 100) + '%');
+        el('taTotalFailures', formatNumber(usage.reduce((s, u) => s + (u.failure_count || 0), 0)));
+        if (usage.length > 0) el('taTopTool', usage[0].tool_name + ' (' + formatNumber(usage[0].total_calls) + ')');
+        el('taAvgDaily', formatNumber(Math.round((t.total_events || 0) / 30)));
+        const byTool = {};
+        usage.forEach(u => { byTool[u.tool_name] = u.total_calls; });
+        const coreCount = ['Bash','Read','Edit','Write'].reduce((s, tn) => s + (byTool[tn] || 0), 0);
+        const searchCount = ['Grep','Glob'].reduce((s, tn) => s + (byTool[tn] || 0), 0);
+        const advCount = Math.max(0, (t.total_events || 0) - coreCount - searchCount);
+        el('taCoreCount', formatNumber(coreCount));
+        el('taCorePct', t.total_events > 0 ? ((coreCount / t.total_events) * 100).toFixed(1) + '%' : '0%');
+        el('taSearchCount', formatNumber(searchCount));
+        el('taSearchPct', t.total_events > 0 ? ((searchCount / t.total_events) * 100).toFixed(1) + '%' : '0%');
+        el('taAdvancedCount', formatNumber(advCount));
+        el('taAdvancedPct', t.total_events > 0 ? ((advCount / t.total_events) * 100).toFixed(1) + '%' : '0%');
+        _liveToolsLoaded = true;
+      } catch (e) { console.warn('Live tool analytics fetch failed:', e); }
+    }
+
+    // ─── Expertise Routing Heatmap (fetches from /api/expertise) ─
+    let _expertiseLoaded = false;
+    async function loadExpertiseHeatmap() {
+      if (_expertiseLoaded) return;
+      try {
+        const r = await fetch('/api/expertise');
+        const data = await r.json();
+        if (data.error) return;
+        const heatmap = data.heatmap || [];
+        const complexityDist = data.complexity_dist || [];
+        const totals = data.totals || {};
+        const badge = document.getElementById('taExpertiseBadge');
+        if (badge) badge.textContent = (totals.unique_domains || 0) + ' domains';
+        const hmEl = document.getElementById('expertiseHeatmap');
+        if (hmEl && heatmap.length > 0) {
+          const models = [...new Set(heatmap.map(h => h.model))].sort();
+          const domainNames = [...new Set(heatmap.map(h => h.domain))];
+          const lookup = {};
+          heatmap.forEach(h => { lookup[h.domain + '|' + h.model] = h; });
+          const maxQ = Math.max(...heatmap.map(h => h.count || 0), 1);
+          const mColors = { haiku:{r:0,g:217,b:255}, sonnet:{r:0,g:230,b:118}, opus:{r:233,g:69,b:96}, flash:{r:255,g:215,b:0}, local:{r:156,g:39,b:176}, 'local-fast':{r:255,g:152,b:0} };
+          let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.85rem;">';
+          html += '<thead><tr><th style="text-align:left;padding:8px 12px;color:var(--text-secondary);font-weight:500;">Domain</th>';
+          models.forEach(m => { html += '<th style="text-align:center;padding:8px 12px;color:var(--text-secondary);font-weight:500;">' + m.charAt(0).toUpperCase() + m.slice(1) + '</th>'; });
+          html += '<th style="text-align:center;padding:8px 12px;color:var(--text-secondary);font-weight:500;">Primary</th></tr></thead><tbody>';
+          domainNames.forEach(domain => {
+            html += '<tr><td style="padding:8px 12px;color:var(--text-primary);font-weight:500;border-bottom:1px solid var(--border);">' + domain.charAt(0).toUpperCase() + domain.slice(1) + '</td>';
+            let maxModel = '', maxCount = 0;
+            models.forEach(model => {
+              const cell = lookup[domain + '|' + model];
+              const q = cell ? (cell.count || 0) : 0;
+              const mc = mColors[model] || {r:120,g:120,b:120};
+              const bg = q > 0 ? 'rgba(' + mc.r + ',' + mc.g + ',' + mc.b + ',' + (0.15 + q / maxQ * 0.7).toFixed(2) + ')' : 'transparent';
+              if (q > maxCount) { maxCount = q; maxModel = model; }
+              html += '<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);background:' + bg + ';border-radius:4px;">';
+              if (q > 0) {
+                html += '<div style="font-weight:600;color:var(--text-primary);">' + formatNumber(q) + '</div>';
+                html += '<div style="font-size:0.7rem;color:var(--text-secondary);">exp: ' + (cell.avg_expertise || 0).toFixed(2) + '</div>';
+              } else { html += '<span style="color:var(--text-secondary);opacity:0.3;">—</span>'; }
+              html += '</td>';
+            });
+            const pc = mColors[maxModel] || {r:120,g:120,b:120};
+            html += '<td style="text-align:center;padding:8px 12px;border-bottom:1px solid var(--border);">';
+            if (maxModel) html += '<span style="background:rgba(' + pc.r + ',' + pc.g + ',' + pc.b + ',0.2);color:rgb(' + pc.r + ',' + pc.g + ',' + pc.b + ');padding:3px 10px;border-radius:12px;font-size:0.8rem;font-weight:600;">' + maxModel + '</span>';
+            html += '</td></tr>';
+          });
+          html += '</tbody></table></div>';
+          html += '<div style="margin-top:12px;display:flex;gap:16px;font-size:0.8rem;color:var(--text-secondary);">';
+          html += '<span>' + formatNumber(totals.total_events || 0) + ' routing events</span>';
+          html += '<span>' + (totals.unique_domains || 0) + ' domains</span>';
+          html += '<span>avg expertise: ' + (totals.avg_expertise || 0).toFixed(2) + '</span></div>';
+          hmEl.innerHTML = html;
+        } else if (hmEl) { hmEl.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:2rem;">No expertise routing data yet</div>'; }
+        const cxEl = document.getElementById('expertiseComplexity');
+        if (cxEl && complexityDist.length > 0) {
+          const byLevel = {};
+          complexityDist.forEach(c => { byLevel[c.level || 'unknown'] = (byLevel[c.level || 'unknown'] || 0) + (c.count || 0); });
+          const levels = Object.entries(byLevel).sort((a, b) => b[1] - a[1]);
+          const maxB = Math.max(...levels.map(function(l) { return l[1]; }), 1);
+          const lColors = { low:'rgba(0,217,255,0.7)', medium:'rgba(0,230,118,0.7)', high:'rgba(255,152,0,0.7)', extreme:'rgba(233,69,96,0.7)' };
+          let cxHtml = '';
+          levels.forEach(function(pair) {
+            const level = pair[0], count = pair[1];
+            const pct = (count / maxB * 100).toFixed(0);
+            const color = lColors[level] || 'rgba(120,120,120,0.7)';
+            cxHtml += '<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px;"><span style="color:var(--text-primary);font-weight:500;">' + level.charAt(0).toUpperCase() + level.slice(1) + '</span><span style="color:var(--text-secondary);">' + formatNumber(count) + '</span></div><div style="background:var(--bg-hover);border-radius:4px;height:10px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:' + color + ';border-radius:4px;transition:width 0.5s;"></div></div></div>';
+          });
+          cxEl.innerHTML = cxHtml;
+        } else if (cxEl) { cxEl.innerHTML = '<div style="text-align:center;color:var(--text-secondary);padding:2rem;">No complexity data</div>'; }
+        _expertiseLoaded = true;
+      } catch (e) { console.warn('Expertise heatmap fetch failed:', e); }
+    }
+
+    // ─── Lazy-load on tab switch ─────────────────────────────────
     const origSwitchTab = switchTab;
     switchTab = function(tabId) {
       origSwitchTab(tabId);
       if (tabId === 'velocity') renderVelocity();
+      if (tabId === 'tool-analytics') { loadLiveToolAnalytics(); loadExpertiseHeatmap(); }
     };
-
-    // Handle initial hash load (override not yet active at hash-check time)
     if (window.location.hash === '#velocity') renderVelocity();
+    if (window.location.hash === '#tool-analytics') { loadLiveToolAnalytics(); loadExpertiseHeatmap(); }
 
   </script>
 </body>

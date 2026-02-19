@@ -732,6 +732,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             "/api/autonomy": self.get_autonomy,
             "/api/all-data": self.get_all_data,
             "/api/crm": self.get_crm,
+            "/api/expertise": self.get_expertise,
             "/": self.redirect_dashboard,
         }
 
@@ -918,10 +919,65 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         self.send_json({"sessions": sessions, "count": len(sessions)})
 
     def get_tools(self, params: Dict[str, List[str]]) -> None:
-        limit = int(params.get("limit", [100])[0])
-        usage = self.load_jsonl(CLAUDE_DIR / "data/tool-usage.jsonl", limit)
-        success = self.load_jsonl(CLAUDE_DIR / "data/tool-success.jsonl", limit)
-        self.send_json({"usage": usage, "success": success, "total_usage": len(usage), "total_success": len(success)})
+        """Tool analytics from live tool_events table (114K+ rows)."""
+        days = int(params.get("days", [7])[0])
+        try:
+            conn = sqlite3.connect(str(DB_PATH), timeout=5)
+            conn.row_factory = sqlite3.Row
+            cutoff = int(datetime.now().timestamp()) - (days * 86400)
+
+            # Top tools by call count
+            usage = [dict(r) for r in conn.execute("""
+                SELECT tool_name, count(*) as total_calls,
+                       sum(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count,
+                       sum(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failure_count,
+                       round(avg(duration_ms), 1) as avg_duration_ms,
+                       round(100.0 * sum(CASE WHEN success = 1 THEN 1 ELSE 0 END) / count(*), 1) as success_rate
+                FROM tool_events WHERE timestamp > ?
+                GROUP BY tool_name ORDER BY total_calls DESC
+            """, (cutoff,)).fetchall()]
+
+            # Failing tools (lowest success rate with >5 calls)
+            failing = [dict(r) for r in conn.execute("""
+                SELECT tool_name, count(*) as total,
+                       round(100.0 * sum(CASE WHEN success = 1 THEN 1 ELSE 0 END) / count(*), 1) as success_rate
+                FROM tool_events WHERE timestamp > ?
+                GROUP BY tool_name HAVING count(*) > 5
+                ORDER BY success_rate ASC LIMIT 10
+            """, (cutoff,)).fetchall()]
+
+            # Hourly tool activity pattern
+            hourly = [dict(r) for r in conn.execute("""
+                SELECT cast(strftime('%H', timestamp, 'unixepoch', 'localtime') as integer) as hour,
+                       count(*) as calls
+                FROM tool_events WHERE timestamp > ?
+                GROUP BY hour ORDER BY hour
+            """, (cutoff,)).fetchall()]
+
+            # Total stats
+            totals = dict(conn.execute("""
+                SELECT count(*) as total_events,
+                       count(DISTINCT tool_name) as unique_tools,
+                       round(100.0 * sum(CASE WHEN success = 1 THEN 1 ELSE 0 END) / count(*), 1) as overall_success_rate,
+                       round(avg(duration_ms), 1) as avg_duration
+                FROM tool_events WHERE timestamp > ?
+            """, (cutoff,)).fetchone())
+
+            conn.close()
+            self.send_json({
+                "usage": usage,
+                "failing": failing,
+                "hourly": hourly,
+                "totals": totals,
+                "days": days,
+                "total_usage": len(usage),
+            })
+        except Exception as e:
+            # Fallback to old JSONL if SQLite fails
+            limit = int(params.get("limit", [100])[0])
+            usage = self.load_jsonl(CLAUDE_DIR / "data/tool-usage.jsonl", limit)
+            success = self.load_jsonl(CLAUDE_DIR / "data/tool-success.jsonl", limit)
+            self.send_json({"usage": usage, "success": success, "total_usage": len(usage), "error_note": str(e)})
 
     def get_git(self, params: Dict[str, List[str]]) -> None:
         limit = int(params.get("limit", [50])[0])
@@ -1040,6 +1096,91 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
                 self.send_json(json.loads(result.stdout))
             else:
                 self.send_json({"error": result.stderr}, 500)
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
+
+    def get_expertise(self, params: Dict[str, List[str]]) -> None:
+        """Expertise routing heatmap — domain × model from 4.5K routing events."""
+        days = int(params.get("days", [30])[0])
+        try:
+            conn = sqlite3.connect(str(DB_PATH), timeout=5)
+            conn.row_factory = sqlite3.Row
+            cutoff = int(datetime.now().timestamp()) - (days * 86400)
+
+            # Domain × Model heatmap
+            heatmap = [dict(r) for r in conn.execute("""
+                SELECT domain, chosen_model as model, count(*) as count,
+                       round(avg(expertise_level), 2) as avg_expertise,
+                       round(avg(query_complexity), 2) as avg_complexity
+                FROM expertise_routing_events WHERE timestamp > ?
+                GROUP BY domain, chosen_model
+                ORDER BY count DESC
+            """, (cutoff,)).fetchall()]
+
+            # Domain summary
+            domains = [dict(r) for r in conn.execute("""
+                SELECT domain, count(*) as total_queries,
+                       round(avg(expertise_level), 2) as avg_expertise,
+                       round(avg(query_complexity), 2) as avg_complexity,
+                       group_concat(DISTINCT chosen_model) as models_used
+                FROM expertise_routing_events WHERE timestamp > ?
+                GROUP BY domain ORDER BY total_queries DESC
+            """, (cutoff,)).fetchall()]
+
+            # Model preference by domain (which model dominates each domain)
+            preferences = [dict(r) for r in conn.execute("""
+                SELECT domain, chosen_model as dominant_model,
+                       count(*) as count,
+                       round(100.0 * count(*) / (
+                           SELECT count(*) FROM expertise_routing_events e2
+                           WHERE e2.domain = expertise_routing_events.domain AND e2.timestamp > ?
+                       ), 1) as pct
+                FROM expertise_routing_events WHERE timestamp > ?
+                GROUP BY domain, chosen_model
+                HAVING count(*) = (
+                    SELECT max(cnt) FROM (
+                        SELECT count(*) as cnt FROM expertise_routing_events e3
+                        WHERE e3.domain = expertise_routing_events.domain AND e3.timestamp > ?
+                        GROUP BY e3.chosen_model
+                    )
+                )
+                ORDER BY count DESC
+            """, (cutoff, cutoff, cutoff)).fetchall()]
+
+            # Complexity distribution
+            complexity_dist = [dict(r) for r in conn.execute("""
+                SELECT
+                    CASE
+                        WHEN query_complexity < 0.3 THEN 'low'
+                        WHEN query_complexity < 0.6 THEN 'medium'
+                        WHEN query_complexity < 0.8 THEN 'high'
+                        ELSE 'extreme'
+                    END as level,
+                    chosen_model as model,
+                    count(*) as count
+                FROM expertise_routing_events WHERE timestamp > ?
+                GROUP BY level, model
+                ORDER BY level, count DESC
+            """, (cutoff,)).fetchall()]
+
+            # Totals
+            totals = dict(conn.execute("""
+                SELECT count(*) as total_events,
+                       count(DISTINCT domain) as unique_domains,
+                       round(avg(expertise_level), 2) as avg_expertise,
+                       round(avg(query_complexity), 2) as avg_complexity
+                FROM expertise_routing_events WHERE timestamp > ?
+            """, (cutoff,)).fetchone())
+
+            conn.close()
+            self.send_json({
+                "heatmap": heatmap,
+                "domains": domains,
+                "preferences": preferences,
+                "complexity_dist": complexity_dist,
+                "totals": totals,
+                "days": days,
+            })
         except Exception as e:
             self.send_json({"error": str(e)}, 500)
 
