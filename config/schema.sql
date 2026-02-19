@@ -261,6 +261,29 @@ CREATE TABLE IF NOT EXISTS expertise_routing_events (
     query_hash TEXT
 );
 
+-- Permission prompt / autonomy interruption events
+CREATE TABLE IF NOT EXISTS autonomy_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp INTEGER NOT NULL,
+    event_type TEXT NOT NULL,       -- 'permission_prompt', 'permission_granted', 'permission_denied'
+    session_id TEXT,
+    tool_name TEXT,
+    context TEXT
+);
+
+-- Pre-computed autonomous execution streaks
+CREATE TABLE IF NOT EXISTS autonomy_streaks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    start_ts INTEGER NOT NULL,
+    end_ts INTEGER NOT NULL,
+    duration_seconds INTEGER NOT NULL,
+    tool_count INTEGER NOT NULL,
+    avg_gap_seconds REAL,
+    projects TEXT,                  -- JSON array of project paths
+    top_tools TEXT,                 -- JSON: {"Edit": 701, "Bash": 534, ...}
+    session_ids TEXT                -- JSON array of overlapping session IDs
+);
+
 -- ============================================================
 -- INDEXES
 -- ============================================================
@@ -312,6 +335,13 @@ CREATE INDEX IF NOT EXISTS idx_coordinator_action ON coordinator_events(action);
 CREATE INDEX IF NOT EXISTS idx_expertise_timestamp ON expertise_routing_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_expertise_domain ON expertise_routing_events(domain);
 CREATE INDEX IF NOT EXISTS idx_expertise_model ON expertise_routing_events(chosen_model);
+
+CREATE INDEX IF NOT EXISTS idx_autonomy_timestamp ON autonomy_events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_autonomy_session ON autonomy_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_autonomy_event_type ON autonomy_events(event_type);
+
+CREATE INDEX IF NOT EXISTS idx_streaks_start ON autonomy_streaks(start_ts);
+CREATE INDEX IF NOT EXISTS idx_streaks_duration ON autonomy_streaks(duration_seconds);
 
 -- ============================================================
 -- VIEWS

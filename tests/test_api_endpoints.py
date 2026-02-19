@@ -190,3 +190,91 @@ class TestAPIServer:
         """REST endpoints should include no-cache headers."""
         r = self.get("/api/stats")
         assert "no-cache" in r.headers.get("cache-control", "")
+
+    # ─── CRM Endpoint Tests ───────────────────────────────────
+
+    def test_crm_endpoint_returns_200(self):
+        r = self.get("/api/crm")
+        assert r.status_code == 200
+
+    def test_crm_returns_valid_structure(self):
+        r = self.get("/api/crm")
+        data = r.json()
+        assert "stats" in data
+        assert "contacts" in data
+        assert "deals" in data
+        assert "interactions" in data
+        assert "follow_ups" in data
+        assert "categories" in data
+
+    def test_crm_stats_fields(self):
+        r = self.get("/api/crm")
+        stats = r.json()["stats"]
+        assert "total_contacts" in stats
+        assert "active_deals" in stats
+        assert "pipeline_value" in stats
+        assert "won_deals" in stats
+        assert "total_interactions" in stats
+        assert "follow_ups_due" in stats
+
+    def test_crm_contacts_have_correct_count(self):
+        r = self.get("/api/crm")
+        data = r.json()
+        assert data["stats"]["total_contacts"] == 3
+        assert len(data["contacts"]) == 3
+
+    def test_crm_contacts_have_required_fields(self):
+        r = self.get("/api/crm")
+        contact = r.json()["contacts"][0]
+        for field in ["id", "name", "company", "role", "category", "x_handle", "deals", "interactions"]:
+            assert field in contact, f"Missing field: {field}"
+
+    def test_crm_deals_have_correct_count(self):
+        r = self.get("/api/crm")
+        data = r.json()
+        # 2 active (meeting + prospect), 1 won
+        assert data["stats"]["active_deals"] == 2
+        assert data["stats"]["won_deals"] == 1
+        assert len(data["deals"]) == 3
+
+    def test_crm_pipeline_value_excludes_won_and_lost(self):
+        r = self.get("/api/crm")
+        # Active pipeline: $100K (meeting) + $50K (prospect) = $150K
+        assert r.json()["stats"]["pipeline_value"] == 150000.0
+
+    def test_crm_deals_include_contact_name(self):
+        r = self.get("/api/crm")
+        deals = r.json()["deals"]
+        named_deals = [d for d in deals if d.get("contact_name")]
+        assert len(named_deals) == 3
+
+    def test_crm_interactions_have_correct_count(self):
+        r = self.get("/api/crm")
+        data = r.json()
+        assert data["stats"]["total_interactions"] == 3
+        assert len(data["interactions"]) == 3
+
+    def test_crm_follow_ups_due(self):
+        r = self.get("/api/crm")
+        data = r.json()
+        # 2 follow-ups with dates within 7 days
+        assert data["stats"]["follow_ups_due"] >= 0
+        for fu in data["follow_ups"]:
+            assert "name" in fu
+            assert "follow_up" in fu
+
+    def test_crm_categories_breakdown(self):
+        r = self.get("/api/crm")
+        cats = r.json()["categories"]
+        assert len(cats) > 0
+        cat_names = [c["category"] for c in cats]
+        assert "investor" in cat_names or "lead" in cat_names
+
+    def test_crm_in_all_endpoints_json_check(self):
+        """CRM endpoint returns valid JSON like all other endpoints."""
+        r = self.get("/api/crm")
+        assert r.status_code == 200
+        try:
+            r.json()
+        except Exception:
+            pytest.fail(f"/api/crm returned invalid JSON: {r.text[:200]}")

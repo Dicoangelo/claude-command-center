@@ -37,6 +37,7 @@ from urllib.parse import parse_qs, urlparse
 HOME = Path.home()
 CLAUDE_DIR = HOME / ".claude"
 DB_PATH = CLAUDE_DIR / "data" / "claude.db"
+ANTIGRAVITY_DB = HOME / ".agent-core" / "storage" / "antigravity.db"
 DASHBOARD_HTML = CLAUDE_DIR / "dashboard" / "claude-command-center.html"
 PORT = 8766
 
@@ -143,7 +144,6 @@ class DataStreamer:
             ).fetchone()
 
             # Active sessions (last 5 minutes)
-            datetime.now().timestamp() - 300
             active = conn.execute("""
                 SELECT COUNT(*) as c FROM sessions
                 WHERE ended_at IS NULL OR ended_at > datetime('now', '-5 minutes')
@@ -156,6 +156,20 @@ class DataStreamer:
                 FROM sessions ORDER BY started_at DESC LIMIT 1
             """).fetchone()
 
+            # Calculate API value for ROI
+            cost_row = conn.execute("""
+                SELECT SUM(cost_estimate) as total_cost
+                FROM daily_stats
+            """).fetchone()
+            api_value = cost_row["total_cost"] or 0 if cost_row else 0
+
+            # Today's cost
+            today_cost_row = conn.execute(
+                "SELECT cost_estimate FROM daily_stats WHERE date = ?",
+                (today,),
+            ).fetchone()
+            today_cost = today_cost_row["cost_estimate"] if today_cost_row else 0
+
             conn.close()
 
             return {
@@ -166,15 +180,27 @@ class DataStreamer:
                     "opus_in": trow["opus_in"] or 0,
                     "opus_out": trow["opus_out"] or 0,
                     "opus_cache": trow["opus_cache"] or 0,
+                    "sonnet_in": trow["sonnet_in"] or 0,
+                    "sonnet_out": trow["sonnet_out"] or 0,
+                    "haiku_in": trow["haiku_in"] or 0,
+                    "haiku_out": trow["haiku_out"] or 0,
                 },
                 "today": {
                     "messages": today_row["messages"] if today_row else 0,
                     "sessions": today_row["sessions"] if today_row else 0,
                     "tools": today_row["tools"] if today_row else 0,
                     "tokens": today_row["tokens"] if today_row else 0,
+                    "cost": round(today_cost, 2),
                 }
                 if today_row
-                else {"messages": 0, "sessions": 0, "tools": 0, "tokens": 0},
+                else {
+                    "messages": 0,
+                    "sessions": 0,
+                    "tools": 0,
+                    "tokens": 0,
+                    "cost": 0,
+                },
+                "apiValue": round(api_value, 2),
                 "activeSessions": active["c"] if active else 0,
                 "latestSession": {
                     "id": latest["id"][:12] if latest else None,
@@ -204,6 +230,32 @@ class DataStreamer:
             "daemons": daemons,
             "timestamp": datetime.now().isoformat(),
         }
+
+    def _poll_velocity(self) -> Dict[str, Any]:
+        """Velocity field status for SSE streaming."""
+        try:
+            coord_dir = CLAUDE_DIR / "coordinator"
+            sys.path.insert(0, str(coord_dir))
+            from velocity_field import VelocityField, DIM_NAMES
+            field = VelocityField()
+            vector = field.sample()
+            composition = field.compose(vector)
+
+            # Compute level from composite score
+            c = vector.weighted_composite()
+            level = "surge" if c >= 0.7 else "active" if c >= 0.4 else "steady" if c >= 0.2 else "calm"
+
+            return {
+                "composite": round(c, 3),
+                "level": level,
+                "agents": composition.agent_count_int,
+                "parallelism": composition.parallelism_label,
+                "effort": composition.effort_label,
+                "dimensions": {DIM_NAMES[i]: round(vector.dimensions[i], 3) for i in range(len(vector.dimensions))},
+                "timestamp": datetime.now().isoformat(),
+            }
+        except Exception as e:
+            return {"error": str(e), "timestamp": datetime.now().isoformat()}
 
     def _data_changed(self, key: str, data: Dict[str, Any]) -> bool:
         """Check if data changed since last poll."""
@@ -235,13 +287,16 @@ class DataStreamer:
                     if self._data_changed("stats", stats):
                         self.broadcast("stats", stats)
 
-                    # Health every 15 seconds (every 5th poll)
+                    # Health + velocity every 15 seconds (every 5th poll)
                     health_counter += 1
                     if health_counter >= 5:
                         health_counter = 0
                         health = self._poll_health()
                         if self._data_changed("health", health):
                             self.broadcast("health", health)
+                        velocity = self._poll_velocity()
+                        if self._data_changed("velocity", velocity):
+                            self.broadcast("velocity", velocity)
 
                     # Heartbeat to keep connection alive
                     self.broadcast("heartbeat", {"t": int(time.time())})
@@ -278,23 +333,21 @@ SSE_CLIENT_JS = """
 
     const indicator = document.createElement('div');
     indicator.id = 'live-status';
-    indicator.style.cssText = 'position:fixed;top:12px;right:16px;' +
-      'display:flex;align-items:center;gap:6px;padding:4px 12px;' +
-      'font-size:0.75rem;cursor:default;z-index:9999;' +
-      'background:rgba(10,12,20,0.85);' +
-      'border:1px solid rgba(0,255,136,0.15);' +
-      'border-radius:20px;backdrop-filter:blur(8px);';
+    indicator.style.cssText = 'display:flex;align-items:center;gap:4px;' +
+      'font-size:0.6rem;cursor:default;margin-top:1px;';
     indicator.innerHTML = `
-      <span id="live-dot" style="width:8px;height:8px;border-radius:50%;
+      <span id="live-dot" style="width:6px;height:6px;border-radius:50%;
         background:#ff4d6a;display:inline-block;
         transition:background 0.3s;"></span>
-      <span id="live-label" style="color:rgba(255,255,255,0.5);
+      <span id="live-label" style="color:rgba(255,255,255,0.4);
         font-family:JetBrains Mono,monospace;">CONNECTING</span>
       <span id="live-ts" style="color:rgba(255,255,255,0.25);
-        font-family:JetBrains Mono,monospace;font-size:0.65rem;
-        margin-left:4px;"></span>
+        font-family:JetBrains Mono,monospace;font-size:0.55rem;
+        margin-left:2px;"></span>
     `;
-    document.body.appendChild(indicator);
+    const slot = document.getElementById('live-slot');
+    if (slot) { slot.appendChild(indicator); }
+    else { document.body.appendChild(indicator); }
   }
 
   function setStatus(state) {
@@ -324,11 +377,7 @@ SSE_CLIENT_JS = """
 
   // --- DOM Updaters ---
   function updateStats(data) {
-    // Top stat cards (they use specific structure)
-    const statValues = document.querySelectorAll('#overview .stat-value, #statsRow .stat-value');
-
-    // Find and update by matching labels
-    // Overview tab uses .label/.value, other tabs use .stat-label/.stat-value
+    // Top stat cards — match by label text
     document.querySelectorAll('.stat-card').forEach(card => {
       const label = card.querySelector('.label') || card.querySelector('.stat-label');
       const value = card.querySelector('.value') || card.querySelector('.stat-value');
@@ -338,10 +387,19 @@ SSE_CLIENT_JS = """
       if (l === 'SESSIONS') value.textContent = fmtNum(data.totalSessions);
       else if (l === 'MESSAGES') value.textContent = fmtNum(data.totalMessages);
       else if (l === 'TOOL CALLS') value.textContent = fmtNum(data.totalTools);
-      else if (l === 'AVG/DAY') value.textContent = fmtNum(Math.round(data.totalMessages / 35));
+      else if (l === 'AVG/DAY') {
+        const days = Math.max(1, Math.round(data.totalSessions / 70));
+        value.textContent = fmtNum(Math.round(data.totalMessages / Math.max(days, 1)));
+      }
+      else if (l === 'ROI' && data.apiValue > 0) {
+        const days = 39;
+        const subCost = days * (200 / 30);
+        const roi = (data.apiValue / Math.max(subCost, 1)).toFixed(1);
+        value.textContent = roi + 'x';
+      }
     });
 
-    // Token breakdown - uses .token-item > .value/.label
+    // Token breakdown
     const tokenBar = document.getElementById('tokenBreakdown');
     if (tokenBar && data.tokens) {
       const items = tokenBar.querySelectorAll('.token-item');
@@ -356,20 +414,38 @@ SSE_CLIENT_JS = """
       });
     }
 
-    // Today's activity in Power Dashboard
+    // Power Dashboard — session position
     const sessionPosition = document.getElementById('sessionPosition');
     if (sessionPosition && data.today) {
       const pct = Math.min(100, Math.round((data.today.messages / 6800) * 100));
       sessionPosition.textContent = pct + '%';
       const bar = document.getElementById('sessionProgress');
       if (bar) bar.style.width = pct + '%';
+      const fill = document.getElementById('sessionProgressFill');
+      if (fill) fill.style.width = pct + '%';
     }
 
-    // Update the budget
+    // Power Dashboard — budget
     const sessionBudget = document.getElementById('sessionBudget');
     if (sessionBudget && data.today) {
       const budgetPct = Math.min(100, Math.round((data.today.tokens / 500000000) * 100));
       sessionBudget.textContent = budgetPct + '% used';
+    }
+
+    // Power Dashboard — background agents count
+    const bgCount = document.getElementById('bgAgents');
+    if (bgCount && data.activeSessions != null) {
+      bgCount.textContent = data.activeSessions + ' active';
+    }
+
+    // Latest session indicator
+    if (data.latestSession) {
+      const el = document.getElementById('latestSessionInfo');
+      if (el) {
+        const s = data.latestSession;
+        el.innerHTML = '<span style="color:var(--accent-cyan)">' + (s.model||'') +
+          '</span> · ' + s.messages + ' msgs · ' + (s.outcome || 'running');
+      }
     }
 
     lastUpdate = new Date();
@@ -402,6 +478,36 @@ SSE_CLIENT_JS = """
       } catch(err) {}
     });
 
+    source.addEventListener('velocity', (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.error) return;
+        // Update velocity stat cards on the velocity tab
+        document.querySelectorAll('#tab-velocity .stat-card').forEach(card => {
+          const label = card.querySelector('.label,.stat-label');
+          const value = card.querySelector('.value,.stat-value');
+          if (!label || !value) return;
+          const l = label.textContent.trim().toUpperCase();
+          if (l === 'COMPOSITE') value.textContent = d.composite;
+          else if (l === 'LEVEL') value.textContent = d.level;
+          else if (l === 'AGENTS') value.textContent = d.agents;
+          else if (l === 'PARALLELISM') value.textContent = d.parallelism;
+          else if (l === 'EFFORT') value.textContent = d.effort;
+        });
+        // Update velocity dimension bars
+        if (d.dimensions) {
+          Object.entries(d.dimensions).forEach(([name, val]) => {
+            const bar = document.getElementById('vbar-' + name);
+            if (bar) {
+              bar.style.width = (val * 100) + '%';
+              const valEl = bar.closest('.dim-row')?.querySelector('.dim-val');
+              if (valEl) valEl.textContent = val.toFixed(3);
+            }
+          });
+        }
+      } catch(err) { console.warn('SSE velocity parse error:', err); }
+    });
+
     source.addEventListener('heartbeat', () => {
       if (!connected) setStatus('connected');
       retries = 0;
@@ -419,11 +525,143 @@ SSE_CLIENT_JS = """
     };
   }
 
+  // --- Chart Auto-Refresh (SQLite → API → Charts) ---
+  // Keeps all charts fresh from SQLite every 60s
+  let _chartInstances = {};
+
+  function destroyChart(canvasId) {
+    if (_chartInstances[canvasId]) {
+      _chartInstances[canvasId].destroy();
+      delete _chartInstances[canvasId];
+    }
+    // Also destroy any Chart.js instance on the canvas
+    const canvas = document.getElementById(canvasId);
+    if (canvas) {
+      const existing = Chart.getChart(canvas);
+      if (existing) existing.destroy();
+    }
+  }
+
+  function refreshAllCharts() {
+    fetch('/api/all-data')
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) return;
+        const stats = data.stats;
+        if (!stats) return;
+
+        // Update STATS_DATA properties in-place (it's const but object is mutable)
+        if (window.STATS_DATA_LIVE) {
+          Object.assign(window.STATS_DATA_LIVE, stats);
+        } else {
+          window.STATS_DATA_LIVE = stats;
+        }
+
+        // Rebuild daily activity charts
+        if (stats.dailyActivity?.length) {
+          const labels = stats.dailyActivity.map(d => d.date.slice(5));
+
+          // Messages chart
+          destroyChart('messagesChart');
+          const msgCtx = document.getElementById('messagesChart');
+          if (msgCtx) {
+            const grad = msgCtx.getContext('2d').createLinearGradient(0, 0, 0, 280);
+            grad.addColorStop(0, 'rgba(233,69,96,0.9)');
+            grad.addColorStop(1, 'rgba(233,69,96,0.3)');
+            _chartInstances['messagesChart'] = new Chart(msgCtx, {
+              type: 'bar',
+              data: { labels, datasets: [{ data: stats.dailyActivity.map(d => d.messageCount), backgroundColor: grad, borderRadius: 8, borderSkipped: false }] },
+              options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#666', maxTicksLimit: 15 }, grid: { display: false } }, y: { ticks: { color: '#666' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+          }
+
+          // Tools chart
+          destroyChart('toolsChart');
+          const toolCtx = document.getElementById('toolsChart');
+          if (toolCtx) {
+            const grad2 = toolCtx.getContext('2d').createLinearGradient(0, 0, 0, 280);
+            grad2.addColorStop(0, 'rgba(254,202,87,0.9)');
+            grad2.addColorStop(1, 'rgba(254,202,87,0.3)');
+            _chartInstances['toolsChart'] = new Chart(toolCtx, {
+              type: 'bar',
+              data: { labels, datasets: [{ data: stats.dailyActivity.map(d => d.toolCallCount), backgroundColor: grad2, borderRadius: 8, borderSkipped: false }] },
+              options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#666', maxTicksLimit: 15 }, grid: { display: false } }, y: { ticks: { color: '#666' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+          }
+        }
+
+        // Tokens chart
+        if (stats.dailyModelTokens?.length) {
+          destroyChart('tokensChart');
+          const tokCtx = document.getElementById('tokensChart');
+          if (tokCtx) {
+            const tokenLabels = stats.dailyModelTokens.map(d => d.date.slice(5));
+            _chartInstances['tokensChart'] = new Chart(tokCtx, {
+              type: 'line',
+              data: {
+                labels: tokenLabels,
+                datasets: [
+                  { label: 'Opus', data: stats.dailyModelTokens.map(d => d.tokensByModel?.opus || 0), borderColor: '#e94560', backgroundColor: 'rgba(233,69,96,0.1)', fill: true, tension: 0.3, pointRadius: 0 },
+                  { label: 'Sonnet', data: stats.dailyModelTokens.map(d => d.tokensByModel?.sonnet || 0), borderColor: '#48dbfb', backgroundColor: 'rgba(72,219,251,0.1)', fill: true, tension: 0.3, pointRadius: 0 },
+                  { label: 'Haiku', data: stats.dailyModelTokens.map(d => d.tokensByModel?.haiku || 0), borderColor: '#feca57', backgroundColor: 'rgba(254,202,87,0.1)', fill: true, tension: 0.3, pointRadius: 0 },
+                ]
+              },
+              options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#888', boxWidth: 12 } } }, scales: { x: { ticks: { color: '#666', maxTicksLimit: 15 }, grid: { display: false } }, y: { ticks: { color: '#666', callback: v => v >= 1e9 ? (v/1e9).toFixed(0)+'B' : v >= 1e6 ? (v/1e6).toFixed(0)+'M' : v >= 1e3 ? (v/1e3).toFixed(0)+'K' : v }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+          }
+        }
+
+        // Hour chart
+        if (stats.hourCounts) {
+          destroyChart('hourChart');
+          const hourCtx = document.getElementById('hourChart');
+          if (hourCtx) {
+            const hourData = Array.from({length: 24}, () => 0);
+            Object.entries(stats.hourCounts).forEach(([h, c]) => hourData[parseInt(h)] = c);
+            _chartInstances['hourChart'] = new Chart(hourCtx, {
+              type: 'bar',
+              data: { labels: Array.from({length: 24}, (_, i) => i + 'h'), datasets: [{ data: hourData, backgroundColor: hourData.map((_, i) => i >= 22 || i <= 5 ? 'rgba(233,69,96,0.7)' : i >= 9 && i <= 18 ? 'rgba(72,219,251,0.7)' : 'rgba(254,202,87,0.7)'), borderRadius: 4 }] },
+              options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#666' }, grid: { display: false } }, y: { ticks: { color: '#666' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            });
+          }
+        }
+
+        // Update stat card values
+        updateStats({
+          totalSessions: stats.totalSessions,
+          totalMessages: stats.totalMessages,
+          totalTools: stats.totalTools,
+          tokens: stats.modelUsage ? {
+            opus_in: stats.modelUsage.opus?.inputTokens || 0,
+            opus_out: stats.modelUsage.opus?.outputTokens || 0,
+            opus_cache: stats.modelUsage.opus?.cacheReadInputTokens || 0,
+            sonnet_in: stats.modelUsage.sonnet?.inputTokens || 0,
+            sonnet_out: stats.modelUsage.sonnet?.outputTokens || 0,
+            haiku_in: stats.modelUsage.haiku?.inputTokens || 0,
+            haiku_out: stats.modelUsage.haiku?.outputTokens || 0,
+          } : {},
+          apiValue: data.subscription?.totalValue || 0,
+          today: stats.dailyActivity?.length ? (() => {
+            const today = stats.dailyActivity[stats.dailyActivity.length - 1];
+            return { messages: today.messageCount, sessions: today.sessionCount, tools: today.toolCallCount, tokens: 0, cost: 0 };
+          })() : { messages: 0, sessions: 0, tools: 0, tokens: 0, cost: 0 },
+          activeSessions: 0,
+          latestSession: null,
+        });
+
+        console.log('[CCC-LIVE] Charts refreshed from SQLite at', new Date().toLocaleTimeString());
+      })
+      .catch(err => console.warn('[CCC-LIVE] Chart refresh failed:', err));
+  }
+
   // --- Init ---
   createStatusIndicator();
   // Only connect if served from HTTP (not file://)
   if (location.protocol.startsWith('http')) {
     connect();
+    // Refresh charts from SQLite on load + every 60s
+    setTimeout(refreshAllCharts, 2000);
+    setInterval(refreshAllCharts, 60000);
   } else {
     setStatus('disconnected');
     document.getElementById('live-label').textContent = 'STATIC';
@@ -489,7 +727,11 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             "/api/health": self.get_health,
             "/api/fate": self.get_fate,
             "/api/cognitive": self.get_cognitive,
+            "/api/velocity": self.get_velocity,
             "/api/memory/stats": self.get_memory_stats,
+            "/api/autonomy": self.get_autonomy,
+            "/api/all-data": self.get_all_data,
+            "/api/crm": self.get_crm,
             "/": self.redirect_dashboard,
         }
 
@@ -724,6 +966,162 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         flow = self.load_json(CLAUDE_DIR / "kernel/cognitive-os/flow-state.json")
         weekly = self.load_json(CLAUDE_DIR / "kernel/cognitive-os/weekly-energy.json")
         self.send_json({"current_state": state, "flow_state": flow, "weekly_energy": weekly})
+
+    def get_velocity(self, params: Dict[str, List[str]]) -> None:
+        """VAAC velocity field status — 10D vector, composition, and history."""
+        try:
+            coord_dir = CLAUDE_DIR / "coordinator"
+            sys.path.insert(0, str(coord_dir))
+
+            # Sample velocity field
+            from velocity_field import VelocityField, DIM_NAMES
+            field = VelocityField()
+            vector = field.sample()
+            composition = field.compose(vector)
+
+            # Get VAAC 3-signal aggregation
+            from velocity import VelocitySignalAggregator
+            agg = VelocitySignalAggregator()
+            vaac_status = agg.get_velocity_status()
+
+            # Read velocity history
+            history_path = coord_dir / "data" / "velocity-history.jsonl"
+            history = []
+            if history_path.exists():
+                for line in history_path.read_text().strip().split("\n")[-50:]:
+                    if line.strip():
+                        try:
+                            history.append(json.loads(line))
+                        except Exception:
+                            pass
+
+            self.send_json({
+                "field": vector.to_dict(),
+                "composition": composition.to_dict(),
+                "vaac": vaac_status,
+                "history": history,
+                "dim_names": DIM_NAMES,
+                "timestamp": datetime.now().isoformat(),
+            })
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
+
+    def get_autonomy(self, params: Dict[str, List[str]]) -> None:
+        """Autonomy streak data from SQLite."""
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["python3", str(Path(__file__).parent / "ccc-sql-data.py"), "autonomy"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                self.send_json(json.loads(result.stdout))
+            else:
+                self.send_json({"error": result.stderr}, 500)
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
+
+    def get_all_data(self, params: Dict[str, List[str]]) -> None:
+        """All chart data from SQLite — single source of truth for the dashboard.
+
+        Returns stats, subscription, outcomes, routing, recovery, autonomy
+        all from SQLite so charts never go stale.
+        """
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["python3", str(Path(__file__).parent / "ccc-sql-data.py"), "all"],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode == 0:
+                self.send_json(json.loads(result.stdout))
+            else:
+                self.send_json({"error": result.stderr}, 500)
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
+
+    def get_crm(self, params: Dict[str, List[str]]) -> None:
+        """CRM data from antigravity.db — contacts, deals, interactions."""
+        try:
+            conn = sqlite3.connect(str(ANTIGRAVITY_DB), timeout=5)
+            conn.row_factory = sqlite3.Row
+
+            # Stats
+            stats = {}
+            row = conn.execute("SELECT count(*) as c FROM crm_contacts").fetchone()
+            stats["total_contacts"] = row["c"] if row else 0
+
+            row = conn.execute("SELECT count(*) as c, sum(value) as v FROM crm_deals WHERE stage NOT IN ('won','lost')").fetchone()
+            stats["active_deals"] = row["c"] if row else 0
+            stats["pipeline_value"] = round(row["v"] or 0, 2) if row else 0
+
+            row = conn.execute("SELECT count(*) as c FROM crm_deals WHERE stage = 'won'").fetchone()
+            stats["won_deals"] = row["c"] if row else 0
+
+            row = conn.execute("SELECT count(*) as c FROM crm_interactions").fetchone()
+            stats["total_interactions"] = row["c"] if row else 0
+
+            row = conn.execute("""
+                SELECT count(*) as c FROM crm_interactions
+                WHERE follow_up IS NOT NULL AND follow_up_date <= date('now', '+7 days')
+            """).fetchone()
+            stats["follow_ups_due"] = row["c"] if row else 0
+
+            # Contacts with deal + interaction counts
+            contacts = [dict(r) for r in conn.execute("""
+                SELECT c.id, c.name, c.company, c.role, c.category, c.x_handle, c.email, c.source,
+                       count(DISTINCT d.id) as deals, count(DISTINCT i.id) as interactions
+                FROM crm_contacts c
+                LEFT JOIN crm_deals d ON d.contact_id = c.id
+                LEFT JOIN crm_interactions i ON i.contact_id = c.id
+                GROUP BY c.id ORDER BY c.updated_at DESC
+            """).fetchall()]
+
+            # Deals with contact names
+            deals = [dict(r) for r in conn.execute("""
+                SELECT d.*, c.name as contact_name
+                FROM crm_deals d LEFT JOIN crm_contacts c ON d.contact_id = c.id
+                ORDER BY CASE d.stage
+                    WHEN 'prospect' THEN 1 WHEN 'contacted' THEN 2 WHEN 'meeting' THEN 3
+                    WHEN 'proposal' THEN 4 WHEN 'negotiation' THEN 5 WHEN 'won' THEN 6 WHEN 'lost' THEN 7 END,
+                    d.updated_at DESC
+            """).fetchall()]
+
+            # Recent interactions
+            interactions = [dict(r) for r in conn.execute("""
+                SELECT i.*, c.name as contact_name
+                FROM crm_interactions i LEFT JOIN crm_contacts c ON i.contact_id = c.id
+                ORDER BY i.created_at DESC LIMIT 20
+            """).fetchall()]
+
+            # Follow-ups due
+            follow_ups = [dict(r) for r in conn.execute("""
+                SELECT c.name, c.company, i.follow_up, i.follow_up_date, i.type
+                FROM crm_interactions i JOIN crm_contacts c ON i.contact_id = c.id
+                WHERE i.follow_up IS NOT NULL AND i.follow_up_date <= date('now', '+7 days')
+                ORDER BY i.follow_up_date
+            """).fetchall()]
+
+            # Category breakdown
+            categories = [dict(r) for r in conn.execute("""
+                SELECT category, count(*) as count FROM crm_contacts GROUP BY category ORDER BY count DESC
+            """).fetchall()]
+
+            conn.close()
+
+            self.send_json({
+                "stats": stats,
+                "contacts": contacts,
+                "deals": deals,
+                "interactions": interactions,
+                "follow_ups": follow_ups,
+                "categories": categories,
+            })
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
 
     def get_memory_stats(self, params: Dict[str, List[str]]) -> None:
         if not MEMORY_AVAILABLE:

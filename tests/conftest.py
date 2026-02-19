@@ -260,6 +260,63 @@ def tmp_claude_dir(tmp_path, tmp_db):
     config_dir = claude_dir / "config"
     config_dir.mkdir()
 
+    # Agent-core directory with CRM tables in antigravity.db
+    agent_core_dir = tmp_path / ".agent-core" / "storage"
+    agent_core_dir.mkdir(parents=True)
+    ag_db = agent_core_dir / "antigravity.db"
+    ag_conn = sqlite3.connect(str(ag_db))
+    ag_conn.executescript("""
+        CREATE TABLE IF NOT EXISTS crm_contacts (
+            id TEXT PRIMARY KEY, name TEXT NOT NULL, company TEXT, role TEXT,
+            email TEXT, phone TEXT, x_handle TEXT, linkedin TEXT,
+            category TEXT DEFAULT 'lead', tags TEXT, notes TEXT, source TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS crm_deals (
+            id TEXT PRIMARY KEY, contact_id TEXT REFERENCES crm_contacts(id),
+            title TEXT NOT NULL, stage TEXT DEFAULT 'prospect', value REAL,
+            currency TEXT DEFAULT 'USD', product TEXT, notes TEXT,
+            next_action TEXT, next_action_date TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS crm_interactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contact_id TEXT REFERENCES crm_contacts(id),
+            deal_id TEXT REFERENCES crm_deals(id),
+            type TEXT NOT NULL, summary TEXT NOT NULL, sentiment TEXT,
+            follow_up TEXT, follow_up_date TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+    ag_conn.executemany(
+        "INSERT INTO crm_contacts (id, name, company, role, category, x_handle, source) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+            ("c001", "Alice Chen", "Acme Corp", "CTO", "investor", "@alicechen", "x-intel"),
+            ("c002", "Bob Smith", "StartupX", "CEO", "lead", "@bobsmith", "inbound"),
+            ("c003", "Carol Davis", "BigTech", "VP Eng", "partner", "@carold", "meeting"),
+        ],
+    )
+    ag_conn.executemany(
+        "INSERT INTO crm_deals (id, contact_id, title, stage, value, product, next_action, next_action_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            ("d001", "c001", "Series A Discussion", "meeting", 100000, "metaventions", "Send deck", "2026-02-25"),
+            ("d002", "c002", "Enterprise Pilot", "prospect", 50000, "ucw", "Intro call", "2026-02-22"),
+            ("d003", "c001", "Advisory Retainer", "won", 24000, "consulting", None, None),
+        ],
+    )
+    ag_conn.executemany(
+        "INSERT INTO crm_interactions (contact_id, deal_id, type, summary, sentiment, follow_up, follow_up_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [
+            ("c001", "d001", "meeting", "Discussed Series A terms", "positive", "Send term sheet", "2026-02-24"),
+            ("c002", "d002", "x-dm", "Initial outreach via X", "neutral", "Schedule call", "2026-02-23"),
+            ("c003", None, "email", "Partnership exploration", "positive", None, None),
+        ],
+    )
+    ag_conn.commit()
+    ag_conn.close()
+
     return claude_dir
 
 

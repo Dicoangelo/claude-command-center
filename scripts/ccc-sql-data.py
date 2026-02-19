@@ -18,7 +18,7 @@ import json
 import sqlite3
 import sys
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict
 
@@ -673,9 +673,104 @@ def get_recovery_data() -> Dict[str, Any]:
     }
 
 
+def get_autonomy_data() -> Dict[str, Any]:
+    """Generate __AUTONOMY_DATA__ from autonomy_streaks table."""
+    conn = get_db()
+
+    # Top 10 streaks
+    top_rows = conn.execute(
+        "SELECT * FROM autonomy_streaks ORDER BY duration_seconds DESC LIMIT 10"
+    ).fetchall()
+
+    top_streaks = []
+    for r in top_rows:
+        start_dt = datetime.fromtimestamp(r["start_ts"])
+        top_streaks.append({
+            "rank": len(top_streaks) + 1,
+            "duration": r["duration_seconds"],
+            "durationFormatted": str(timedelta(seconds=r["duration_seconds"])),
+            "date": start_dt.strftime("%Y-%m-%d"),
+            "time": start_dt.strftime("%H:%M"),
+            "toolCount": r["tool_count"],
+            "avgGap": r["avg_gap_seconds"],
+            "projects": json.loads(r["projects"]) if r["projects"] else [],
+            "topTools": json.loads(r["top_tools"]) if r["top_tools"] else {},
+        })
+
+    # Record
+    record = top_streaks[0] if top_streaks else None
+
+    # Total stats
+    stats_row = conn.execute("""
+        SELECT COUNT(*) as total_streaks,
+               SUM(duration_seconds) as total_autonomous_seconds,
+               SUM(tool_count) as total_tool_calls,
+               AVG(duration_seconds) as avg_duration,
+               ROUND(AVG(avg_gap_seconds), 2) as avg_gap
+        FROM autonomy_streaks
+    """).fetchone()
+
+    # Daily longest streak (last 30 days)
+    daily_rows = conn.execute("""
+        SELECT date(start_ts, 'unixepoch', 'localtime') as day,
+               MAX(duration_seconds) as longest,
+               COUNT(*) as streak_count,
+               SUM(tool_count) as tools
+        FROM autonomy_streaks
+        WHERE start_ts > unixepoch('now', '-30 days')
+        GROUP BY day
+        ORDER BY day
+    """).fetchall()
+
+    daily_trend = [
+        {"date": r["day"], "longest": r["longest"], "count": r["streak_count"], "tools": r["tools"]}
+        for r in daily_rows
+    ]
+
+    # Streak duration distribution (buckets)
+    buckets = {"<2m": 0, "2-5m": 0, "5-10m": 0, "10-20m": 0, "20-40m": 0, "40m+": 0}
+    all_rows = conn.execute("SELECT duration_seconds FROM autonomy_streaks").fetchall()
+    for r in all_rows:
+        d = r["duration_seconds"]
+        if d < 120:
+            buckets["<2m"] += 1
+        elif d < 300:
+            buckets["2-5m"] += 1
+        elif d < 600:
+            buckets["5-10m"] += 1
+        elif d < 1200:
+            buckets["10-20m"] += 1
+        elif d < 2400:
+            buckets["20-40m"] += 1
+        else:
+            buckets["40m+"] += 1
+
+    # Permission events count (if any logged yet)
+    perm_count = conn.execute(
+        "SELECT COUNT(*) FROM autonomy_events WHERE event_type='permission_prompt'"
+    ).fetchone()[0]
+
+    conn.close()
+
+    return {
+        "record": record,
+        "topStreaks": top_streaks,
+        "stats": {
+            "totalStreaks": stats_row["total_streaks"] or 0,
+            "totalAutonomousSeconds": stats_row["total_autonomous_seconds"] or 0,
+            "totalToolCalls": stats_row["total_tool_calls"] or 0,
+            "avgDuration": round(stats_row["avg_duration"] or 0),
+            "avgGap": stats_row["avg_gap"] or 0,
+        },
+        "dailyTrend": daily_trend,
+        "distribution": buckets,
+        "permissionEvents": perm_count,
+    }
+
+
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: ccc-sql-data.py <stats|subscription|outcomes|routing|recovery|all>")
+        print("Usage: ccc-sql-data.py <stats|subscription|outcomes|routing|recovery|autonomy|all>")
         sys.exit(1)
 
     mode = sys.argv[1]
@@ -691,6 +786,8 @@ def main() -> None:
             print(json.dumps(get_routing_data()))
         elif mode == "recovery":
             print(json.dumps(get_recovery_data()))
+        elif mode == "autonomy":
+            print(json.dumps(get_autonomy_data()))
         elif mode == "all":
             print(
                 json.dumps(
@@ -700,6 +797,7 @@ def main() -> None:
                         "outcomes": get_session_outcomes_data(),
                         "routing": get_routing_data(),
                         "recovery": get_recovery_data(),
+                        "autonomy": get_autonomy_data(),
                     }
                 )
             )
@@ -728,6 +826,9 @@ def main() -> None:
             "routing": ('{"totalQueries":0,"dataQuality":0.0,"feedbackCount":0}'),
             "recovery": (
                 '{"stats":{"total":0},"categories":{},"outcomes":[],"timeline":[],"successByCategory":{},"matrix":[]}'
+            ),
+            "autonomy": (
+                '{"record":null,"topStreaks":[],"stats":{"totalStreaks":0,"totalAutonomousSeconds":0,"totalToolCalls":0,"avgDuration":0,"avgGap":0},"dailyTrend":[],"distribution":{},"permissionEvents":0}'
             ),
         }
         print(defaults.get(mode, "{}"))

@@ -2148,6 +2148,15 @@ else:
     pricing_data = {"models":{"opus":{"input":5,"output":25,"cache_read":0.5},"sonnet":{"input":3,"output":15},"haiku":{"input":0.8,"output":4}}}
 output = output.replace('__PRICING_DATA__', json.dumps(pricing_data))
 
+# Autonomy streaks data from SQLite
+try:
+    import subprocess
+    _r = subprocess.run(['python3', os.path.expanduser('~/projects/core/claude-command-center/scripts/ccc-sql-data.py'), 'autonomy'], capture_output=True, text=True, timeout=10)
+    autonomy_data = safe_parse(_r.stdout, {"record":None,"topStreaks":[],"stats":{},"dailyTrend":[],"distribution":{},"permissionEvents":0})
+except:
+    autonomy_data = {"record":None,"topStreaks":[],"stats":{},"dailyTrend":[],"distribution":{},"permissionEvents":0}
+output = output.replace('__AUTONOMY_DATA__', json.dumps(autonomy_data))
+
 # Write output
 with open('$OUTPUT', 'w') as f:
     f.write(output)
