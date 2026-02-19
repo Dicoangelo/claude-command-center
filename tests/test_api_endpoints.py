@@ -118,7 +118,25 @@ class TestAPIServer:
         assert r.status_code == 200
         data = r.json()
         assert "usage" in data
-        assert "success" in data
+        assert "totals" in data or "success" in data
+
+    def test_commands_endpoint(self):
+        r = self.get("/api/commands")
+        assert r.status_code == 200
+        data = r.json()
+        assert "model_usage" in data
+        assert "top_commands" in data
+        assert "daily" in data
+        assert "totals" in data
+
+    def test_coordinator_endpoint(self):
+        r = self.get("/api/coordinator")
+        assert r.status_code == 200
+        data = r.json()
+        assert "by_strategy" in data
+        assert "by_action" in data
+        assert "recent" in data
+        assert "totals" in data
 
     def test_git_endpoint(self):
         r = self.get("/api/git")

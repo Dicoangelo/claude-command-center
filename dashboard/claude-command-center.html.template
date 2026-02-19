@@ -2517,52 +2517,6 @@
           <div class="command-card"><code>checkpoint</code><div class="desc">Save session checkpoint</div></div>
         </div>
       </div>
-
-      <!-- Live Command Analytics -->
-      <div style="margin-top:2rem;border-top:1px solid var(--border);padding-top:1.5rem;">
-        <h3 style="color:var(--accent-cyan);margin-bottom:1rem;">Command Usage Analytics</h3>
-        <div class="stats-row">
-          <div class="stat-card cyan">
-            <div class="stat-value" id="cmdTotal">—</div>
-            <div class="stat-label">Total Commands</div>
-          </div>
-          <div class="stat-card green">
-            <div class="stat-value" id="cmdUnique">—</div>
-            <div class="stat-label">Unique Commands</div>
-          </div>
-          <div class="stat-card yellow">
-            <div class="stat-value" id="cmdActiveDays">—</div>
-            <div class="stat-label">Active Days</div>
-          </div>
-          <div class="stat-card magenta">
-            <div class="stat-value" id="cmdAvgPerDay">—</div>
-            <div class="stat-label">Avg/Day</div>
-          </div>
-        </div>
-        <div class="charts-grid" style="margin-top:1rem;">
-          <div class="card">
-            <div class="card-header">
-              <h3>Model Preference</h3>
-              <span class="card-badge" id="cmdModelBadge">Loading...</span>
-            </div>
-            <div style="padding:1rem;height:220px;" id="cmdModelChart"></div>
-          </div>
-          <div class="card">
-            <div class="card-header">
-              <h3>Top Commands</h3>
-            </div>
-            <div style="padding:1rem;" id="cmdTopList"></div>
-          </div>
-        </div>
-        <div class="card" style="margin-top:1rem;">
-          <div class="card-header">
-            <h3>Daily Command Volume</h3>
-          </div>
-          <div style="padding:1rem;height:220px;">
-            <canvas id="cmdDailyChart" height="200"></canvas>
-          </div>
-        </div>
-      </div>
     </div>
 
     <!-- ROUTING TAB -->
@@ -4209,47 +4163,6 @@
             </thead>
             <tbody id="autonomyLeaderboard"></tbody>
           </table>
-        </div>
-      </div>
-
-      <!-- Multi-Agent Coordinator Analytics -->
-      <div style="margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1.5rem;">
-        <h3 style="color:var(--accent-cyan);margin-bottom:1rem;">Multi-Agent Coordinator</h3>
-        <div class="stats-row">
-          <div class="stat-card cyan">
-            <div class="stat-value" id="coordTotal">—</div>
-            <div class="stat-label">Total Events</div>
-          </div>
-          <div class="stat-card green">
-            <div class="stat-value" id="coordCompleted">—</div>
-            <div class="stat-label">Completed</div>
-          </div>
-          <div class="stat-card" style="border-color:var(--accent-red);">
-            <div class="stat-value" style="color:var(--accent-red);" id="coordFailed">—</div>
-            <div class="stat-label">Failed</div>
-          </div>
-          <div class="stat-card yellow">
-            <div class="stat-value" id="coordSuccessRate">—</div>
-            <div class="stat-label">Success Rate</div>
-          </div>
-          <div class="stat-card magenta">
-            <div class="stat-value" id="coordAgents">—</div>
-            <div class="stat-label">Unique Agents</div>
-          </div>
-        </div>
-        <div class="charts-grid" style="margin-top:1rem;">
-          <div class="card">
-            <div class="card-header">
-              <h3>Strategy Breakdown</h3>
-            </div>
-            <div style="padding:1rem;" id="coordStrategyList"></div>
-          </div>
-          <div class="card">
-            <div class="card-header">
-              <h3>Recent Agent Events</h3>
-            </div>
-            <div style="padding:1rem;max-height:300px;overflow-y:auto;" id="coordRecentList"></div>
-          </div>
         </div>
       </div>
     </div>
@@ -8875,147 +8788,15 @@
       } catch (e) { console.warn('Expertise heatmap fetch failed:', e); }
     }
 
-    // ─── Command Usage Analytics (fetches from /api/commands) ───
-    let _commandsLoaded = false;
-    async function loadCommandAnalytics() {
-      if (_commandsLoaded) return;
-      try {
-        const r = await fetch('/api/commands');
-        const data = await r.json();
-        if (data.error) return;
-        const t = data.totals || {};
-        const models = data.model_usage || [];
-        const topCmds = data.top_commands || [];
-        const daily = data.daily || [];
-        const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-        el('cmdTotal', formatNumber(t.total_commands || 0));
-        el('cmdUnique', t.unique_commands || 0);
-        el('cmdActiveDays', t.active_days || 0);
-        el('cmdAvgPerDay', t.active_days > 0 ? Math.round((t.total_commands || 0) / t.active_days) : 0);
-
-        // Model preference doughnut
-        const chartEl = document.getElementById('cmdModelChart');
-        if (chartEl && models.length > 0) {
-          const mColors = { opus:'rgba(233,69,96,0.8)', sonnet:'rgba(0,230,118,0.8)', haiku:'rgba(0,217,255,0.8)', other:'rgba(120,120,120,0.5)' };
-          const total = models.reduce((s,m) => s + m.count, 0);
-          const badge = document.getElementById('cmdModelBadge');
-          if (badge) { const top = models[0]; badge.textContent = top.model + ' ' + Math.round(top.count/total*100) + '%'; }
-          const canvas = document.createElement('canvas');
-          canvas.height = 200;
-          chartEl.appendChild(canvas);
-          new Chart(canvas, {
-            type: 'doughnut',
-            data: {
-              labels: models.map(m => m.model.charAt(0).toUpperCase() + m.model.slice(1)),
-              datasets: [{ data: models.map(m => m.count), backgroundColor: models.map(m => mColors[m.model] || mColors.other), borderWidth: 0 }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#999', font: { size: 11 }, padding: 8 } }, tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.raw + ' (' + Math.round(ctx.raw/total*100) + '%)' } } } }
-          });
-        }
-
-        // Top commands bar list
-        const topEl = document.getElementById('cmdTopList');
-        if (topEl && topCmds.length > 0) {
-          const maxC = topCmds[0].count;
-          let html = '';
-          topCmds.slice(0, 10).forEach(c => {
-            const pct = (c.count / maxC * 100).toFixed(0);
-            html += '<div style="margin-bottom:8px;"><div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:3px;"><code style="color:var(--accent-cyan);">' + c.command + '</code><span style="color:var(--text-secondary);">' + formatNumber(c.count) + '</span></div><div style="background:var(--bg-hover);border-radius:3px;height:6px;overflow:hidden;"><div style="width:' + pct + '%;height:100%;background:var(--accent-cyan);border-radius:3px;"></div></div></div>';
-          });
-          topEl.innerHTML = html;
-        }
-
-        // Daily command volume chart (stacked bar: opus/sonnet/haiku)
-        const dailyCanvas = document.getElementById('cmdDailyChart');
-        if (dailyCanvas && daily.length > 0) {
-          new Chart(dailyCanvas, {
-            type: 'bar',
-            data: {
-              labels: daily.map(d => d.day.slice(5)),
-              datasets: [
-                { label: 'Opus', data: daily.map(d => d.opus || 0), backgroundColor: 'rgba(233,69,96,0.7)', borderRadius: 2 },
-                { label: 'Sonnet', data: daily.map(d => d.sonnet || 0), backgroundColor: 'rgba(0,230,118,0.7)', borderRadius: 2 },
-                { label: 'Haiku', data: daily.map(d => d.haiku || 0), backgroundColor: 'rgba(0,217,255,0.7)', borderRadius: 2 },
-                { label: 'Other', data: daily.map(d => Math.max(0, (d.total||0) - (d.opus||0) - (d.sonnet||0) - (d.haiku||0))), backgroundColor: 'rgba(120,120,120,0.4)', borderRadius: 2 }
-              ]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#999', font: { size: 10 } } } }, scales: { x: { stacked: true, ticks: { color: '#666', font: { size: 9 } }, grid: { display: false } }, y: { stacked: true, ticks: { color: '#666' }, grid: { color: 'rgba(255,255,255,0.05)' } } } }
-          });
-        }
-        _commandsLoaded = true;
-      } catch (e) { console.warn('Command analytics fetch failed:', e); }
-    }
-
-    // ─── Coordinator Analytics (fetches from /api/coordinator) ───
-    let _coordinatorLoaded = false;
-    async function loadCoordinatorAnalytics() {
-      if (_coordinatorLoaded) return;
-      try {
-        const r = await fetch('/api/coordinator');
-        const data = await r.json();
-        if (data.error) return;
-        const t = data.totals || {};
-        const strategies = data.by_strategy || [];
-        const recent = data.recent || [];
-        const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-        el('coordTotal', t.total_events || 0);
-        el('coordCompleted', t.total_completed || 0);
-        el('coordFailed', t.total_failed || 0);
-        el('coordSuccessRate', (t.success_rate || 0) + '%');
-        el('coordAgents', t.unique_agents || 0);
-
-        // Strategy breakdown
-        const stratEl = document.getElementById('coordStrategyList');
-        if (stratEl && strategies.length > 0) {
-          let html = '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">';
-          html += '<thead><tr style="border-bottom:1px solid var(--border);"><th style="text-align:left;padding:6px 8px;color:var(--text-secondary);">Strategy</th><th style="text-align:center;padding:6px 8px;color:var(--text-secondary);">Total</th><th style="text-align:center;padding:6px 8px;color:var(--accent-green);">OK</th><th style="text-align:center;padding:6px 8px;color:var(--accent-red);">Fail</th><th style="text-align:center;padding:6px 8px;color:var(--text-secondary);">Timeout</th><th style="text-align:right;padding:6px 8px;color:var(--text-secondary);">Avg ms</th></tr></thead><tbody>';
-          strategies.forEach(s => {
-            const rate = s.total > 0 ? Math.round(s.completed / s.total * 100) : 0;
-            const color = rate >= 50 ? 'var(--accent-green)' : rate > 0 ? 'var(--accent-yellow)' : 'var(--accent-red)';
-            html += '<tr style="border-bottom:1px solid var(--border);"><td style="padding:8px;font-weight:500;color:var(--text-primary);">' + s.strategy + ' <span style="font-size:0.7rem;color:' + color + ';">' + rate + '%</span></td>';
-            html += '<td style="text-align:center;padding:8px;color:var(--text-secondary);">' + s.total + '</td>';
-            html += '<td style="text-align:center;padding:8px;color:var(--accent-green);">' + s.completed + '</td>';
-            html += '<td style="text-align:center;padding:8px;color:var(--accent-red);">' + s.failed + '</td>';
-            html += '<td style="text-align:center;padding:8px;color:var(--text-secondary);">' + s.timed_out + '</td>';
-            html += '<td style="text-align:right;padding:8px;color:var(--text-secondary);">' + (s.avg_duration_ms ? formatNumber(Math.round(s.avg_duration_ms)) : '—') + '</td></tr>';
-          });
-          html += '</tbody></table>';
-          stratEl.innerHTML = html;
-        }
-
-        // Recent events
-        const recentEl = document.getElementById('coordRecentList');
-        if (recentEl && recent.length > 0) {
-          const actionColors = { complete: 'var(--accent-green)', fail: 'var(--accent-red)', timeout: 'var(--accent-yellow)', spawn: 'var(--accent-cyan)' };
-          let html = '';
-          recent.forEach(evt => {
-            const ac = actionColors[evt.action] || 'var(--text-secondary)';
-            html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.8rem;">';
-            html += '<span style="color:' + ac + ';font-weight:600;min-width:60px;">' + evt.action + '</span>';
-            html += '<span style="color:var(--text-secondary);min-width:55px;">' + (evt.time || '').slice(11, 19) + '</span>';
-            html += '<span style="color:var(--accent-cyan);font-family:monospace;font-size:0.75rem;">' + (evt.strategy || '—') + '</span>';
-            if (evt.result_preview) html += '<span style="color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:0.75rem;">' + evt.result_preview + '</span>';
-            html += '</div>';
-          });
-          recentEl.innerHTML = html;
-        }
-        _coordinatorLoaded = true;
-      } catch (e) { console.warn('Coordinator analytics fetch failed:', e); }
-    }
-
     // ─── Lazy-load on tab switch ─────────────────────────────────
     const origSwitchTab = switchTab;
     switchTab = function(tabId) {
       origSwitchTab(tabId);
       if (tabId === 'velocity') renderVelocity();
       if (tabId === 'tool-analytics') { loadLiveToolAnalytics(); loadExpertiseHeatmap(); }
-      if (tabId === 'commands') loadCommandAnalytics();
-      if (tabId === 'autonomy') loadCoordinatorAnalytics();
     };
     if (window.location.hash === '#velocity') renderVelocity();
     if (window.location.hash === '#tool-analytics') { loadLiveToolAnalytics(); loadExpertiseHeatmap(); }
-    if (window.location.hash === '#commands') loadCommandAnalytics();
-    if (window.location.hash === '#autonomy') loadCoordinatorAnalytics();
 
   </script>
 </body>

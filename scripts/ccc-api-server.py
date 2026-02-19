@@ -733,6 +733,8 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             "/api/all-data": self.get_all_data,
             "/api/crm": self.get_crm,
             "/api/expertise": self.get_expertise,
+            "/api/commands": self.get_commands,
+            "/api/coordinator": self.get_coordinator,
             "/": self.redirect_dashboard,
         }
 
@@ -1180,6 +1182,121 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
                 "complexity_dist": complexity_dist,
                 "totals": totals,
                 "days": days,
+            })
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
+
+    def get_commands(self, params: Dict[str, List[str]]) -> None:
+        """Command usage analytics from command_events table."""
+        try:
+            conn = sqlite3.connect(str(DB_PATH), timeout=5)
+            conn.row_factory = sqlite3.Row
+
+            # Model preference (normalize aliases)
+            model_usage = [dict(r) for r in conn.execute("""
+                SELECT CASE
+                    WHEN lower(command) IN ('co','opus') THEN 'opus'
+                    WHEN lower(command) IN ('cc','sonnet') THEN 'sonnet'
+                    WHEN lower(command) IN ('cq','haiku') THEN 'haiku'
+                    ELSE 'other'
+                END as model, count(*) as count
+                FROM command_events GROUP BY model ORDER BY count DESC
+            """).fetchall()]
+
+            # Top commands
+            top_commands = [dict(r) for r in conn.execute("""
+                SELECT command, count(*) as count,
+                       round(avg(execution_time_ms), 0) as avg_ms
+                FROM command_events
+                WHERE command != ''
+                GROUP BY command ORDER BY count DESC LIMIT 15
+            """).fetchall()]
+
+            # Daily timeline
+            daily = [dict(r) for r in conn.execute("""
+                SELECT date(timestamp, 'unixepoch', 'localtime') as day,
+                       count(*) as total,
+                       sum(CASE WHEN lower(command) IN ('co','opus') THEN 1 ELSE 0 END) as opus,
+                       sum(CASE WHEN lower(command) IN ('cc','sonnet') THEN 1 ELSE 0 END) as sonnet,
+                       sum(CASE WHEN lower(command) IN ('cq','haiku') THEN 1 ELSE 0 END) as haiku
+                FROM command_events GROUP BY day ORDER BY day
+            """).fetchall()]
+
+            # Totals
+            totals = dict(conn.execute("""
+                SELECT count(*) as total_commands,
+                       count(DISTINCT command) as unique_commands,
+                       count(DISTINCT date(timestamp, 'unixepoch', 'localtime')) as active_days
+            FROM command_events
+            """).fetchone())
+
+            conn.close()
+            self.send_json({
+                "model_usage": model_usage,
+                "top_commands": top_commands,
+                "daily": daily,
+                "totals": totals,
+            })
+        except Exception as e:
+            self.send_json({"error": str(e)}, 500)
+
+    def get_coordinator(self, params: Dict[str, List[str]]) -> None:
+        """Multi-agent coordinator event analytics."""
+        try:
+            conn = sqlite3.connect(str(DB_PATH), timeout=5)
+            conn.row_factory = sqlite3.Row
+
+            # By strategy
+            by_strategy = [dict(r) for r in conn.execute("""
+                SELECT COALESCE(NULLIF(strategy, ''), 'unnamed') as strategy,
+                       count(*) as total,
+                       sum(CASE WHEN action = 'complete' THEN 1 ELSE 0 END) as completed,
+                       sum(CASE WHEN action = 'fail' THEN 1 ELSE 0 END) as failed,
+                       sum(CASE WHEN action = 'timeout' THEN 1 ELSE 0 END) as timed_out,
+                       round(avg(duration_ms), 0) as avg_duration_ms
+                FROM coordinator_events GROUP BY strategy ORDER BY total DESC
+            """).fetchall()]
+
+            # By action
+            by_action = [dict(r) for r in conn.execute("""
+                SELECT action, count(*) as count
+                FROM coordinator_events GROUP BY action ORDER BY count DESC
+            """).fetchall()]
+
+            # Timeline
+            daily = [dict(r) for r in conn.execute("""
+                SELECT date(timestamp, 'unixepoch', 'localtime') as day,
+                       count(*) as total,
+                       sum(CASE WHEN action = 'complete' THEN 1 ELSE 0 END) as completed,
+                       sum(CASE WHEN action = 'fail' THEN 1 ELSE 0 END) as failed
+                FROM coordinator_events GROUP BY day ORDER BY day
+            """).fetchall()]
+
+            # Recent events
+            recent = [dict(r) for r in conn.execute("""
+                SELECT id, datetime(timestamp, 'unixepoch', 'localtime') as time,
+                       agent_id, action, strategy, duration_ms, exit_code,
+                       substr(result, 1, 80) as result_preview
+                FROM coordinator_events ORDER BY timestamp DESC LIMIT 15
+            """).fetchall()]
+
+            # Totals
+            totals = dict(conn.execute("""
+                SELECT count(*) as total_events,
+                       count(DISTINCT agent_id) as unique_agents,
+                       sum(CASE WHEN action = 'complete' THEN 1 ELSE 0 END) as total_completed,
+                       sum(CASE WHEN action = 'fail' THEN 1 ELSE 0 END) as total_failed,
+                       round(100.0 * sum(CASE WHEN action = 'complete' THEN 1 ELSE 0 END) / max(count(*), 1), 1) as success_rate
+                FROM coordinator_events
+            """).fetchone())
+
+            conn.close()
+            self.send_json({
+                "by_strategy": by_strategy,
+                "by_action": by_action,
+                "daily": daily,
+                "recent": recent,
+                "totals": totals,
             })
         except Exception as e:
             self.send_json({"error": str(e)}, 500)
