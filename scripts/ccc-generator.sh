@@ -21,6 +21,10 @@ mkdir -p "$HOME/.claude/dashboard"
 
 echo "🚀 Building Command Center..."
 
+# Scan latest transcript → daily_stats (tokens, messages, sessions)
+echo "  🔄 Scanning latest session transcript..."
+python3 "$HOME/.claude/scripts/session-end-scanner.py" --quiet 2>/dev/null || true
+
 # Regenerate kernel data (keeps cost/productivity/coevo in sync)
 echo "  🔄 Syncing kernel data..."
 python3 "$HOME/.claude/scripts/regenerate-kernel-data.py" --quiet 2>/dev/null || true

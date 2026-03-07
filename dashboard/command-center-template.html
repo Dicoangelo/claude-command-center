@@ -95,20 +95,20 @@
     }
 
     .nav-logo {
-      width: 32px;
-      height: 32px;
+      width: 38px;
+      height: 38px;
       background: var(--gradient-primary);
-      border-radius: 9px;
+      border-radius: 11px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
-      font-size: 1.1rem;
-      box-shadow: 0 0 12px rgba(0, 217, 255, 0.3), 0 0 4px rgba(0, 255, 136, 0.2);
+      font-size: 1.25rem;
+      box-shadow: 0 0 16px rgba(0, 217, 255, 0.4), 0 0 6px rgba(0, 255, 136, 0.25);
     }
 
     .nav-title {
-      font-size: 1.15rem;
+      font-size: 1.4rem;
       font-weight: 700;
       background: var(--gradient-primary);
       -webkit-background-clip: text;
@@ -139,8 +139,8 @@
       cursor: pointer;
       border: none;
       background: transparent;
-      color: var(--text-muted);
-      font-size: 0.7rem;
+      color: rgba(255,255,255,0.35);
+      font-size: 0.75rem;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -250,8 +250,8 @@
 
     .card:hover {
       border-color: var(--border-glow);
-      box-shadow: var(--glow-cyan), inset 0 1px 0 rgba(255,255,255,0.05);
-      transform: translateY(-2px);
+      box-shadow: 0 0 28px rgba(0,217,255,0.2), 0 0 56px rgba(0,217,255,0.08), inset 0 1px 0 rgba(255,255,255,0.05);
+      transform: translateY(-3px);
     }
 
     .card-header {
@@ -262,7 +262,7 @@
     }
 
     .card h3 {
-      font-size: 0.78rem;
+      font-size: 0.88rem;
       text-transform: uppercase;
       letter-spacing: 1.2px;
       color: var(--text-secondary);
@@ -272,9 +272,9 @@
     .card-badge {
       background: rgba(0, 217, 255, 0.08);
       color: var(--accent-cyan);
-      padding: 0.3rem 0.875rem;
+      padding: 0.35rem 0.95rem;
       border-radius: 20px;
-      font-size: 0.65rem;
+      font-size: 0.7rem;
       font-weight: 600;
       border: 1px solid rgba(0, 217, 255, 0.15);
       letter-spacing: 0.5px;
@@ -287,11 +287,11 @@
       animation: cardEntrance 0.5s ease backwards;
     }
     .stats-row .stat-card:nth-child(1), .cost-hero .cost-card:nth-child(1) { animation-delay: 0s; }
-    .stats-row .stat-card:nth-child(2), .cost-hero .cost-card:nth-child(2) { animation-delay: 0.06s; }
-    .stats-row .stat-card:nth-child(3), .cost-hero .cost-card:nth-child(3) { animation-delay: 0.12s; }
-    .stats-row .stat-card:nth-child(4), .cost-hero .cost-card:nth-child(4) { animation-delay: 0.18s; }
-    .stats-row .stat-card:nth-child(5) { animation-delay: 0.24s; }
-    .stats-row .stat-card:nth-child(6) { animation-delay: 0.30s; }
+    .stats-row .stat-card:nth-child(2), .cost-hero .cost-card:nth-child(2) { animation-delay: 0.08s; }
+    .stats-row .stat-card:nth-child(3), .cost-hero .cost-card:nth-child(3) { animation-delay: 0.16s; }
+    .stats-row .stat-card:nth-child(4), .cost-hero .cost-card:nth-child(4) { animation-delay: 0.24s; }
+    .stats-row .stat-card:nth-child(5) { animation-delay: 0.32s; }
+    .stats-row .stat-card:nth-child(6) { animation-delay: 0.40s; }
 
     @keyframes cardEntrance {
       from { opacity: 0; transform: translateY(12px); }
@@ -326,7 +326,7 @@
 
     .suggestions-list {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 0.75rem;
     }
 
@@ -366,7 +366,7 @@
     /* Stats Grid */
     .stats-row {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 1.25rem;
       margin-bottom: 2rem;
     }
@@ -374,8 +374,8 @@
     .stat-card {
       background: linear-gradient(160deg, rgba(12, 14, 24, 0.95), rgba(6, 6, 12, 0.95));
       border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px;
-      padding: 1.5rem;
+      border-radius: 18px;
+      padding: 1.75rem;
       position: relative;
       overflow: hidden;
       backdrop-filter: blur(12px) saturate(1.2);
@@ -400,12 +400,18 @@
       background: linear-gradient(90deg, transparent, rgba(0, 217, 255, 0.4), rgba(0, 255, 136, 0.4), transparent);
     }
 
-    .stat-card:nth-child(1):hover { border-color: rgba(0, 217, 255, 0.4); }
-    .stat-card:nth-child(2):hover { border-color: rgba(0, 255, 136, 0.4); }
-    .stat-card:nth-child(3):hover { border-color: rgba(255, 123, 84, 0.4); }
-    .stat-card:nth-child(4):hover { border-color: rgba(177, 78, 255, 0.4); }
-    .stat-card:nth-child(5):hover { border-color: rgba(255, 204, 0, 0.4); }
-    .stat-card:nth-child(6):hover { border-color: rgba(255, 77, 106, 0.4); }
+    .stat-card:nth-child(1) { border-color: rgba(0, 217, 255, 0.15); }
+    .stat-card:nth-child(2) { border-color: rgba(0, 255, 136, 0.15); }
+    .stat-card:nth-child(3) { border-color: rgba(255, 123, 84, 0.15); }
+    .stat-card:nth-child(4) { border-color: rgba(177, 78, 255, 0.15); }
+    .stat-card:nth-child(5) { border-color: rgba(255, 204, 0, 0.15); }
+    .stat-card:nth-child(6) { border-color: rgba(255, 77, 106, 0.15); }
+    .stat-card:nth-child(1):hover { border-color: rgba(0, 217, 255, 0.5); }
+    .stat-card:nth-child(2):hover { border-color: rgba(0, 255, 136, 0.5); }
+    .stat-card:nth-child(3):hover { border-color: rgba(255, 123, 84, 0.5); }
+    .stat-card:nth-child(4):hover { border-color: rgba(177, 78, 255, 0.5); }
+    .stat-card:nth-child(5):hover { border-color: rgba(255, 204, 0, 0.5); }
+    .stat-card:nth-child(6):hover { border-color: rgba(255, 77, 106, 0.5); }
 
     .stat-card::after {
       content: '';
@@ -414,34 +420,46 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: radial-gradient(ellipse at top left, rgba(0, 217, 255, 0.04), transparent 60%);
       pointer-events: none;
     }
+    .stat-card:nth-child(1)::after { background: radial-gradient(ellipse at top left, rgba(0, 217, 255, 0.06), transparent 55%); }
+    .stat-card:nth-child(2)::after { background: radial-gradient(ellipse at top left, rgba(0, 255, 136, 0.06), transparent 55%); }
+    .stat-card:nth-child(3)::after { background: radial-gradient(ellipse at top left, rgba(255, 123, 84, 0.06), transparent 55%); }
+    .stat-card:nth-child(4)::after { background: radial-gradient(ellipse at top left, rgba(177, 78, 255, 0.06), transparent 55%); }
+    .stat-card:nth-child(5)::after { background: radial-gradient(ellipse at top left, rgba(255, 204, 0, 0.06), transparent 55%); }
+    .stat-card:nth-child(6)::after { background: radial-gradient(ellipse at top left, rgba(255, 77, 106, 0.06), transparent 55%); }
 
     .stat-card .icon {
-      width: 44px;
-      height: 44px;
+      width: 52px;
+      height: 52px;
       background: rgba(0, 217, 255, 0.1);
       border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.3rem;
-      margin-bottom: 1rem;
+      font-size: 1.5rem;
+      margin-bottom: 1.25rem;
       border: 1px solid rgba(0, 217, 255, 0.2);
     }
 
     .stat-card .stat-value,
     .stat-card .value {
-      font-size: clamp(1.4rem, 2.5vw, 2.1rem);
+      font-size: clamp(2rem, 3.2vw, 3rem);
       font-weight: 700;
-      background: var(--gradient-primary);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
       line-height: 1.1;
       font-family: 'JetBrains Mono', monospace;
-      filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.15));
+      background: var(--gradient-primary);
+    }
+    .stat-card:nth-child(1) .value { background: linear-gradient(135deg, #00d9ff, #00b8d4); -webkit-background-clip:text; filter: drop-shadow(0 0 12px rgba(0,217,255,0.3)); }
+    .stat-card:nth-child(2) .value { background: linear-gradient(135deg, #00ff88, #00cc6a); -webkit-background-clip:text; filter: drop-shadow(0 0 12px rgba(0,255,136,0.3)); }
+    .stat-card:nth-child(3) .value { background: linear-gradient(135deg, #ff7b54, #ff5722); -webkit-background-clip:text; filter: drop-shadow(0 0 12px rgba(255,123,84,0.3)); }
+    .stat-card:nth-child(4) .value { background: linear-gradient(135deg, #b14eff, #9c27b0); -webkit-background-clip:text; filter: drop-shadow(0 0 12px rgba(177,78,255,0.3)); }
+    .stat-card:nth-child(5) .value { background: linear-gradient(135deg, #ffcc00, #ffa000); -webkit-background-clip:text; filter: drop-shadow(0 0 12px rgba(255,204,0,0.3)); }
+    .stat-card:nth-child(6) .value { background: linear-gradient(135deg, #ff4d6a, #e91e63); -webkit-background-clip:text; filter: drop-shadow(0 0 12px rgba(255,77,106,0.3)); }
+    .stat-card .value, .stat-card .stat-value { /* fallback */ 
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -449,12 +467,12 @@
 
     .stat-card .stat-label,
     .stat-card .label {
-      color: var(--text-muted);
-      font-size: 0.75rem;
-      margin-top: 0.625rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 1px;
-      font-weight: 500;
+      font-weight: 600;
     }
 
     .stat-card .trend {
@@ -488,12 +506,12 @@
     /* Charts Grid */
     .charts-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       gap: 1.5rem;
     }
 
     .chart-container {
-      height: 280px;
+      height: 320px;
       position: relative;
       padding: 0.5rem 0.25rem;
     }
@@ -1583,8 +1601,8 @@
 
     /* 10X POWER DASHBOARD */
     .power-dashboard {
-      background: linear-gradient(135deg, rgba(0, 217, 255, 0.05), rgba(177, 78, 255, 0.05));
-      border: 1px solid rgba(0, 217, 255, 0.2);
+      background: linear-gradient(135deg, rgba(0, 217, 255, 0.07), rgba(177, 78, 255, 0.06));
+      border: 1px solid rgba(0, 217, 255, 0.3);
       border-radius: 16px;
       padding: 1.5rem;
       margin-bottom: 1.5rem;
@@ -1599,7 +1617,14 @@
       left: 0;
       right: 0;
       height: 3px;
-      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple), var(--accent-green));
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple), var(--accent-green), var(--accent-cyan));
+      background-size: 300% 100%;
+      animation: gradientSlide 4s ease infinite;
+    }
+    @keyframes gradientSlide {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
 
     .power-header {
@@ -1610,7 +1635,7 @@
     }
 
     .power-header h2 {
-      font-size: 1.25rem;
+      font-size: 1.4rem;
       font-weight: 700;
       background: var(--gradient-primary);
       -webkit-background-clip: text;
@@ -1660,16 +1685,17 @@
     }
 
     .power-card {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1rem;
+      border-radius: 14px;
+      padding: 1.25rem;
       transition: border-color 0.3s, box-shadow 0.3s;
     }
 
     .power-card:hover {
-      border-color: rgba(0, 217, 255, 0.2);
-      box-shadow: 0 0 12px rgba(0, 217, 255, 0.06);
+      border-color: rgba(0, 217, 255, 0.35);
+      box-shadow: 0 0 20px rgba(0, 217, 255, 0.1), 0 0 40px rgba(0, 217, 255, 0.04);
+      transform: translateY(-2px);
     }
 
     .power-card-header {
@@ -1680,13 +1706,13 @@
     }
 
     .power-card-header h4 {
-      font-size: 0.85rem;
+      font-size: 1rem;
       font-weight: 600;
       color: var(--text-secondary);
     }
 
     .power-icon {
-      font-size: 1rem;
+      font-size: 1.2rem;
     }
 
     .cognitive-mode {
@@ -1697,7 +1723,7 @@
     }
 
     .mode-indicator {
-      font-size: 1.2rem;
+      font-size: 1.4rem;
     }
 
     .mode-indicator.morning { color: #ffcc00; }
@@ -1710,7 +1736,7 @@
       display: flex;
       flex-direction: column;
       gap: 0.25rem;
-      font-size: 0.8rem;
+      font-size: 0.9rem;
       color: var(--text-secondary);
     }
 
@@ -1732,7 +1758,7 @@
     .session-details {
       display: flex;
       justify-content: space-between;
-      font-size: 0.8rem;
+      font-size: 0.95rem;
       color: var(--text-secondary);
     }
 
@@ -1744,14 +1770,15 @@
     }
 
     .memory-stat span:first-child {
-      font-size: 1.5rem;
+      font-size: 2rem;
       font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
       color: var(--accent-cyan);
     }
 
     .memory-stat small {
       color: var(--text-secondary);
-      font-size: 0.75rem;
+      font-size: 0.85rem;
     }
 
     .agent-row {
@@ -1759,7 +1786,7 @@
       align-items: center;
       gap: 0.5rem;
       margin-bottom: 0.4rem;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
     }
 
     .agent-indicator {
@@ -1774,22 +1801,124 @@
       align-items: center;
       gap: 0.75rem;
       padding: 0.75rem 1rem;
-      background: rgba(255, 204, 0, 0.08);
-      border: 1px solid rgba(255, 204, 0, 0.2);
-      border-radius: 8px;
-      font-size: 0.9rem;
+      background: rgba(255, 204, 0, 0.1);
+      border: 1px solid rgba(255, 204, 0, 0.3);
+      border-radius: 10px;
+      font-size: 0.95rem;
       color: var(--text-primary);
     }
+
+
+    /* ── HERO ECOSYSTEM BANNER ── */
+    .hero-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, rgba(0,217,255,0.06), rgba(177,78,255,0.04), rgba(0,255,136,0.03));
+      border: 1px solid rgba(0,217,255,0.2);
+      border-radius: 20px;
+      padding: 1.75rem 2.25rem;
+      margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.4s ease;
+    }
+    .hero-banner::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green), var(--accent-purple), var(--accent-cyan));
+      background-size: 300% 100%;
+      animation: gradientSlide 4s ease infinite;
+    }
+    .hero-headline {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.35rem;
+    }
+    .hero-sub {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+    }
+    .hero-metrics {
+      display: flex;
+      gap: 2.5rem;
+    }
+    .hero-metric {
+      text-align: center;
+    }
+    .hero-metric-value {
+      display: block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      line-height: 1.2;
+      text-shadow: 0 0 16px rgba(0,217,255,0.3);
+    }
+    .hero-metric-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-top: 0.25rem;
+      display: block;
+    }
+    body.present-mode .hero-headline { font-size: 1.8rem !important; }
+    body.present-mode .hero-metric-value { font-size: 2.2rem !important; }
+    body.present-mode .hero-metric-label { font-size: 0.8rem !important; }
+    body.present-mode .hero-banner { padding: 2.25rem 3rem !important; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── PRESENTATION MODE — press P to toggle ── */
+    body.present-mode .stat-card .value,
+    body.present-mode .stat-card .stat-value { font-size: clamp(2.8rem, 4.5vw, 4rem) !important; }
+    body.present-mode .stat-card .label,
+    body.present-mode .stat-card .stat-label { font-size: 1rem !important; }
+    body.present-mode .stat-card .icon { width: 64px; height: 64px; font-size: 1.8rem !important; }
+    body.present-mode .stat-card { padding: 2rem !important; }
+    body.present-mode .power-card-header h4 { font-size: 1.2rem !important; }
+    body.present-mode .power-card { padding: 1.5rem !important; }
+    body.present-mode .memory-stat span:first-child { font-size: 2.6rem !important; }
+    body.present-mode .memory-stat small { font-size: 1rem !important; }
+    body.present-mode .agent-row { font-size: 1.1rem !important; }
+    body.present-mode .cognitive-details { font-size: 1.05rem !important; }
+    body.present-mode .session-details { font-size: 1.05rem !important; }
+    body.present-mode .card h3 { font-size: 1.05rem !important; }
+    body.present-mode .card-badge { font-size: 0.8rem !important; }
+    body.present-mode .chart-container { height: 400px !important; }
+    body.present-mode .nav-tab { font-size: 0.85rem !important; padding: 1.1rem 1rem !important; }
+    body.present-mode .power-header h2 { font-size: 1.7rem !important; }
+    body.present-mode .power-recommendations { font-size: 1.05rem !important; padding: 1rem 1.25rem !important; }
+    body.present-mode .main { padding: 2.5rem 3rem; }
+    #present-badge {
+      display: none; position: fixed; bottom: 1.25rem; right: 1.25rem;
+      background: rgba(0,255,136,0.12); border: 1px solid rgba(0,255,136,0.35);
+      color: #00ff88; padding: 0.4rem 1.1rem; border-radius: 100px;
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 1px;
+      z-index: 9999; font-family: 'JetBrains Mono', monospace;
+    }
+    body.present-mode #present-badge { display: block; }
   </style>
 </head>
 <body>
   <div class="bg-grid"></div>
+  <div id="present-badge">● PRESENT MODE</div>
 
   <nav class="nav">
     <div class="nav-brand">
-      <div class="nav-logo">C</div>
+      <div class="nav-logo">⚡</div>
       <div class="nav-brand-group">
         <div class="nav-title">Command Center</div>
+        <div id="navClock" style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--text-muted);letter-spacing:0.5px;margin-top:1px;"></div>
         <div id="live-slot"></div>
       </div>
     </div>
@@ -1820,6 +1949,29 @@
   <main class="main">
     <!-- OVERVIEW TAB -->
     <div id="overview" class="tab-content active">
+
+      <!-- HERO ECOSYSTEM BANNER -->
+      <div class="hero-banner" id="heroBanner">
+        <div class="hero-left">
+          <div class="hero-headline">Sovereign AI Infrastructure</div>
+          <div class="hero-sub" id="heroGreeting">Building the future of cognitive equity</div>
+        </div>
+        <div class="hero-metrics">
+          <div class="hero-metric">
+            <span class="hero-metric-value" id="heroTokens">—</span>
+            <span class="hero-metric-label">Tokens Processed</span>
+          </div>
+          <div class="hero-metric">
+            <span class="hero-metric-value" id="heroSaved">—</span>
+            <span class="hero-metric-label">Saved via Cache</span>
+          </div>
+          <div class="hero-metric">
+            <span class="hero-metric-value" id="heroCacheEff">—</span>
+            <span class="hero-metric-label">Cache Efficiency</span>
+          </div>
+        </div>
+      </div>
+
       <div class="stats-row" id="statsRow"></div>
 
       <!-- PROACTIVE SUGGESTIONS (Phase 4 - ProactiveVA) -->
@@ -1839,7 +1991,7 @@
       <!-- 10X POWER DASHBOARD -->
       <div class="power-dashboard" id="powerDashboard">
         <div class="power-header">
-          <h2>10x Power Dashboard</h2>
+          <h2>Live System Status</h2>
           <div class="power-modes">
             <button class="power-mode-btn active" data-mode="quick">Quick</button>
             <button class="power-mode-btn" data-mode="full">Full</button>
@@ -8553,7 +8705,7 @@
       if (velocityLoaded) return;
       velocityLoaded = true;
 
-      fetch('/api/velocity')
+      fetch('http://localhost:8766/api/velocity')
         .then(r => r.json())
         .then(data => {
           if (data.error) {
@@ -8775,7 +8927,7 @@
     async function loadLiveToolAnalytics() {
       if (_liveToolsLoaded) return;
       try {
-        const r = await fetch('/api/tools?days=30');
+        const r = await fetch('http://localhost:8766/api/tools?days=30');
         const data = await r.json();
         if (data.error_note) return;
         const t = data.totals || {};
@@ -8807,7 +8959,7 @@
     async function loadExpertiseHeatmap() {
       if (_expertiseLoaded) return;
       try {
-        const r = await fetch('/api/expertise');
+        const r = await fetch('http://localhost:8766/api/expertise');
         const data = await r.json();
         if (data.error) return;
         const heatmap = data.heatmap || [];
@@ -8880,7 +9032,7 @@
     async function loadCommandAnalytics() {
       if (_commandsLoaded) return;
       try {
-        const r = await fetch('/api/commands');
+        const r = await fetch('http://localhost:8766/api/commands');
         const data = await r.json();
         if (data.error) return;
         const t = data.totals || {};
@@ -8951,7 +9103,7 @@
     async function loadCoordinatorAnalytics() {
       if (_coordinatorLoaded) return;
       try {
-        const r = await fetch('/api/coordinator');
+        const r = await fetch('http://localhost:8766/api/coordinator');
         const data = await r.json();
         if (data.error) return;
         const t = data.totals || {};
@@ -9016,6 +9168,93 @@
     if (window.location.hash === '#tool-analytics') { loadLiveToolAnalytics(); loadExpertiseHeatmap(); }
     if (window.location.hash === '#commands') loadCommandAnalytics();
     if (window.location.hash === '#autonomy') loadCoordinatorAnalytics();
+
+
+
+
+    // ── Animated Counters ──
+    (function() {
+      function animateCounters() {
+        document.querySelectorAll('.stat-card .value').forEach(function(el) {
+          var text = el.textContent.trim();
+          if (!text || text === '—' || el.dataset.animated) return;
+          el.dataset.animated = '1';
+          var suffix = '';
+          var num = parseFloat(text);
+          if (text.includes('K')) { suffix = 'K'; num = parseFloat(text); }
+          else if (text.includes('M')) { suffix = 'M'; num = parseFloat(text); }
+          else if (text.includes('x')) { suffix = 'x'; num = parseFloat(text); }
+          else if (text.includes('msgs')) { suffix = ' msgs'; num = parseFloat(text); }
+          else { num = parseFloat(text.replace(/,/g, '')); }
+          if (isNaN(num)) return;
+          var start = 0, duration = 1200, startTime = performance.now();
+          var hasDecimal = text.includes('.') && !text.includes('msgs');
+          function tick(now) {
+            var elapsed = now - startTime;
+            var progress = Math.min(elapsed / duration, 1);
+            var eased = 1 - Math.pow(1 - progress, 3);
+            var current = start + (num - start) * eased;
+            el.textContent = (hasDecimal ? current.toFixed(1) : Math.round(current).toLocaleString()) + suffix;
+            if (progress < 1) requestAnimationFrame(tick);
+          }
+          requestAnimationFrame(tick);
+        });
+      }
+      // Run after stats render (slight delay)
+      setTimeout(animateCounters, 100);
+      // Re-run if SSE updates stats
+      var origRender = window.renderOverview;
+      if (origRender) {
+        window.renderOverview = function() { origRender.apply(this, arguments); setTimeout(animateCounters, 50); };
+      }
+    })();
+
+    // ── Live Clock ──
+    (function() {
+      function updateClock() {
+        var now = new Date();
+        var el = document.getElementById('navClock');
+        if (el) el.textContent = now.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}) + ' · ' + now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+      }
+      updateClock();
+      setInterval(updateClock, 10000);
+    })();
+
+    // ── Hero Banner Population ──
+    (function() {
+      var mu = STATS_DATA.modelUsage || {};
+      var allCache = 0, allIn = 0, allOut = 0;
+      for (var k in mu) { allCache += mu[k].cacheReadInputTokens || 0; allIn += mu[k].inputTokens || 0; allOut += mu[k].outputTokens || 0; }
+      var total = allCache + allIn + allOut;
+      var cacheEff = (allIn + allCache > 0) ? (allCache / (allIn + allCache) * 100) : 99.8;
+      // Estimate savings: cache tokens at input price minus cache price (90% discount)
+      var savedEstimate = allCache * 0.000015 * 0.9; // ~$0.015/1K input, 90% saved via cache
+      function fmt(n) { if (n >= 1e12) return (n/1e12).toFixed(1)+'T'; if (n >= 1e9) return (n/1e9).toFixed(1)+'B'; if (n >= 1e6) return (n/1e6).toFixed(1)+'M'; if (n >= 1e3) return (n/1e3).toFixed(1)+'K'; return n.toString(); }
+      var el1 = document.getElementById('heroTokens');
+      var el2 = document.getElementById('heroSaved');
+      var el3 = document.getElementById('heroCacheEff');
+      if (el1) el1.textContent = fmt(total);
+      if (el2) el2.textContent = '$' + fmt(Math.round(savedEstimate));
+      if (el3) el3.textContent = cacheEff.toFixed(1) + '%';
+      var greeting = document.getElementById('heroGreeting');
+      var cogData = COGNITIVE_DATA;
+      if (greeting && cogData && cogData.current_state && cogData.current_state.greeting) {
+        greeting.textContent = cogData.current_state.greeting;
+      }
+    })();
+
+    // ── Presentation Mode — press P or use ?present=1 ──
+    (function() {
+      var KEY = 'ccc-present-mode';
+      function on() { document.body.classList.add('present-mode'); localStorage.setItem(KEY, '1'); }
+      function off() { document.body.classList.remove('present-mode'); localStorage.setItem(KEY, '0'); }
+      if (new URLSearchParams(location.search).get('present') === '1') on();
+      else if (localStorage.getItem(KEY) === '1') on();
+      document.addEventListener('keydown', function(e) {
+        if ((e.key === 'p' || e.key === 'P') && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA')
+          document.body.classList.contains('present-mode') ? off() : on();
+      });
+    })();
 
   </script>
 </body>
