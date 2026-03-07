@@ -678,24 +678,24 @@ def get_autonomy_data() -> Dict[str, Any]:
     conn = get_db()
 
     # Top 10 streaks
-    top_rows = conn.execute(
-        "SELECT * FROM autonomy_streaks ORDER BY duration_seconds DESC LIMIT 10"
-    ).fetchall()
+    top_rows = conn.execute("SELECT * FROM autonomy_streaks ORDER BY duration_seconds DESC LIMIT 10").fetchall()
 
     top_streaks = []
     for r in top_rows:
         start_dt = datetime.fromtimestamp(r["start_ts"])
-        top_streaks.append({
-            "rank": len(top_streaks) + 1,
-            "duration": r["duration_seconds"],
-            "durationFormatted": str(timedelta(seconds=r["duration_seconds"])),
-            "date": start_dt.strftime("%Y-%m-%d"),
-            "time": start_dt.strftime("%H:%M"),
-            "toolCount": r["tool_count"],
-            "avgGap": r["avg_gap_seconds"],
-            "projects": json.loads(r["projects"]) if r["projects"] else [],
-            "topTools": json.loads(r["top_tools"]) if r["top_tools"] else {},
-        })
+        top_streaks.append(
+            {
+                "rank": len(top_streaks) + 1,
+                "duration": r["duration_seconds"],
+                "durationFormatted": str(timedelta(seconds=r["duration_seconds"])),
+                "date": start_dt.strftime("%Y-%m-%d"),
+                "time": start_dt.strftime("%H:%M"),
+                "toolCount": r["tool_count"],
+                "avgGap": r["avg_gap_seconds"],
+                "projects": json.loads(r["projects"]) if r["projects"] else [],
+                "topTools": json.loads(r["top_tools"]) if r["top_tools"] else {},
+            }
+        )
 
     # Record
     record = top_streaks[0] if top_streaks else None
@@ -723,8 +723,7 @@ def get_autonomy_data() -> Dict[str, Any]:
     """).fetchall()
 
     daily_trend = [
-        {"date": r["day"], "longest": r["longest"], "count": r["streak_count"], "tools": r["tools"]}
-        for r in daily_rows
+        {"date": r["day"], "longest": r["longest"], "count": r["streak_count"], "tools": r["tools"]} for r in daily_rows
     ]
 
     # Streak duration distribution (buckets)
@@ -746,9 +745,7 @@ def get_autonomy_data() -> Dict[str, Any]:
             buckets["40m+"] += 1
 
     # Permission events count (if any logged yet)
-    perm_count = conn.execute(
-        "SELECT COUNT(*) FROM autonomy_events WHERE event_type='permission_prompt'"
-    ).fetchone()[0]
+    perm_count = conn.execute("SELECT COUNT(*) FROM autonomy_events WHERE event_type='permission_prompt'").fetchone()[0]
 
     conn.close()
 
