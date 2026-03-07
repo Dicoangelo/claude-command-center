@@ -1,0 +1,15 @@
+{
+  "id": "46275b6e-8262-4cfc-8ffa-5a8915dd4a24",
+  "status": "completed",
+  "startedAt": "2026-03-06T09:09:16.978Z",
+  "updatedAt": "2026-03-06T10:10:46.101Z",
+  "agentPlugin": "claude",
+  "trackerPlugin": "beads",
+  "epicId": "claude-command-center-77f",
+  "currentIteration": 0,
+  "maxIterations": 50,
+  "totalTasks": 0,
+  "tasksCompleted": 0,
+  "cwd": "/Users/dicoangelo/projects/core/claude-command-center",
+  "endedAt": "2026-03-06T10:10:46.100Z"
+}
