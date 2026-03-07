@@ -158,6 +158,16 @@ class DataStreamer:
                 FROM sessions ORDER BY started_at DESC LIMIT 1
             """).fetchone()
 
+            # Data freshness — how stale is our data?
+            freshness_row = conn.execute("""
+                SELECT MAX(timestamp) as latest FROM activity_events
+            """).fetchone()
+            latest_ts = freshness_row["latest"] if freshness_row and freshness_row["latest"] else None
+            if latest_ts:
+                data_age_minutes = round((datetime.now().timestamp() - latest_ts) / 60, 1)
+            else:
+                data_age_minutes = -1
+
             # Calculate API value for ROI
             cost_row = conn.execute("""
                 SELECT SUM(cost_estimate) as total_cost
@@ -203,6 +213,8 @@ class DataStreamer:
                     "cost": 0,
                 },
                 "apiValue": round(api_value, 2),
+                "dataAgeMinutes": data_age_minutes,
+                "dataFreshness": "fresh" if 0 <= data_age_minutes <= 60 else "stale" if 0 <= data_age_minutes <= 1440 else "offline",
                 "activeSessions": active["c"] if active else 0,
                 "latestSession": {
                     "id": latest["id"][:12] if latest else None,
@@ -347,6 +359,9 @@ SSE_CLIENT_JS = """
       <span id="live-ts" style="color:rgba(255,255,255,0.25);
         font-family:JetBrains Mono,monospace;font-size:0.55rem;
         margin-left:2px;"></span>
+      <span id="data-freshness" style="color:rgba(255,255,255,0.3);
+        font-family:JetBrains Mono,monospace;font-size:0.55rem;
+        margin-left:6px;"></span>
     `;
     const slot = document.getElementById('live-slot');
     if (slot) { slot.appendChild(indicator); }
@@ -454,6 +469,20 @@ SSE_CLIENT_JS = """
     lastUpdate = new Date();
     const ts = document.getElementById('live-ts');
     if (ts) ts.textContent = lastUpdate.toLocaleTimeString();
+
+    // Data freshness indicator
+    const freshEl = document.getElementById('data-freshness');
+    if (freshEl && data.dataAgeMinutes !== undefined) {
+      const age = data.dataAgeMinutes;
+      let text, color;
+      if (age < 0) { text = ''; color = ''; }
+      else if (age <= 5) { text = 'Data: now'; color = '#00ff88'; }
+      else if (age <= 60) { text = 'Data: ' + Math.round(age) + 'm ago'; color = '#00ff88'; }
+      else if (age <= 1440) { text = 'Data: ' + Math.round(age/60) + 'h ago'; color = '#ffcc00'; }
+      else { text = 'Data: ' + Math.round(age/1440) + 'd ago'; color = '#ff4d6a'; }
+      freshEl.textContent = text;
+      freshEl.style.color = color;
+    }
   }
 
   function updateHealth(data) {

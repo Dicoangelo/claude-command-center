@@ -131,7 +131,7 @@
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                │
-│   2,879        258K          89.9K       $5.5K        99.8%       15          │
+│   4,211        382K          89.9K       $8.8K        99.8%       17          │
 │   SESSIONS     MESSAGES      TOOL CALLS  API VALUE    CACHE HIT   TABS        │
 │                                                                                │
 │   ══════════════════════════════════════════════════════════════════════════   │
@@ -255,7 +255,7 @@ flowchart TB
 <p>API value vs $200/mo subscription, per-model token-level cost breakdown, cache efficiency (99.8%), daily cost trends, ROI calculator.</p>
 <br/>
 
-`$5.5K Value` `21.3x ROI` `$5.3K Saved`
+`$8.8K Value` `21.5x ROI` `$8.6K Saved`
 
 <br/>
 <img src="https://img.shields.io/badge/Cache_Hit-99.8%25-00ff88?style=for-the-badge&labelColor=0d1117"/>
@@ -324,10 +324,10 @@ flowchart TB
 
 | # | Tab | Key Metrics | Visual |
 |:-:|:----|:------------|:------:|
-| 1 | **Overview** | 2.9K sessions, 258K messages, 89.9K tools | Charts + Cards |
+| 1 | **Overview** | 4.2K sessions, 382K messages, 89.9K tools | Charts + Cards |
 | 2 | **Memory** | 88 knowledge items, 98 unique tags | Donut + Bars |
 | 3 | **Activity** | Daily messages, session heatmap | Time Series |
-| 4 | **Cost** | $5.5K API value, 21.3x ROI, $200/mo sub | Stacked + Gauge |
+| 4 | **Cost** | $8.8K API value, 21.5x ROI, $200/mo sub | Stacked + Gauge |
 | 5 | **Projects** | 19 repos, 10.6K commits, 3.9M LOC | Table + Stats |
 | 6 | **Commands** | 65 commands, 10 categories | Frequency |
 | 7 | **Routing** | 1.2K queries, DQ 0.665, 52.5% savings | Distribution |
@@ -657,7 +657,7 @@ curl http://localhost:8766/api/health
 ║                                                                              ║
 ║   THE COMMAND CENTER EXISTS BECAUSE:                                          ║
 ║                                                                              ║
-║   ▸ 2,879 sessions generate data that deserves visibility                  ║
+║   ▸ 4,211 sessions generate data that deserves visibility                  ║
 ║   ▸ Self-healing means never waking up to a broken system                  ║
 ║   ▸ Real-time streaming replaces manual dashboard refreshes                ║
 ║   ▸ Every token, every tool call, every session — tracked                  ║
