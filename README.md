@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<img src="https://readme-typing-svg.demolab.com?font=Orbitron&weight=600&size=22&duration=3000&pause=1000&color=00FF88&center=true&vCenter=true&multiline=false&repeat=true&width=700&height=40&lines=15-Tab+Mission+Control+for+Claude+Code+Infrastructure" alt="Typing SVG" />
+<img src="https://readme-typing-svg.demolab.com?font=Orbitron&weight=600&size=22&duration=3000&pause=1000&color=00FF88&center=true&vCenter=true&multiline=false&repeat=true&width=700&height=40&lines=17-Tab+Mission+Control+for+Claude+Code+Infrastructure" alt="Typing SVG" />
 
 <br/>
 
@@ -11,7 +11,7 @@
 [![Status](https://img.shields.io/badge/Status-Live_SSE-00ff88?style=for-the-badge&labelColor=0d1117)](http://localhost:8766/dashboard)
 [![Python](https://img.shields.io/badge/Python-3.12+-00ff88?style=for-the-badge&logo=python&labelColor=0d1117)](https://python.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/Dicoangelo/claude-command-center/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI&labelColor=0d1117&color=00ff88)](https://github.com/Dicoangelo/claude-command-center/actions)
-[![Tests](https://img.shields.io/badge/Tests-124_passing-00ff88?style=for-the-badge&labelColor=0d1117)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-138_passing-00ff88?style=for-the-badge&labelColor=0d1117)](tests/)
 
 <br/>
 
@@ -21,9 +21,9 @@
 
 ### Dashboard Preview
 
-<img src="assets/dashboard-showcase.gif" width="100%" alt="Dashboard cycling through all 15 tabs"/>
+<img src="assets/dashboard-showcase.gif" width="100%" alt="Dashboard cycling through all 17 tabs"/>
 
-<sub>All 15 tabs cycling automatically — Overview through Infrastructure</sub>
+<sub>All 17 tabs cycling automatically — Overview through Velocity</sub>
 
 </div>
 
@@ -32,7 +32,7 @@
 <br/>
 
 <details>
-<summary><h3>📸 Tab Gallery — Click to browse all 15 tabs</h3></summary>
+<summary><h3>📸 Tab Gallery — Click to browse all 17 tabs</h3></summary>
 
 <div align="center">
 
@@ -108,6 +108,16 @@
 
 #### 15. Infrastructure
 <img src="assets/tabs/15-infrastructure.png" width="100%" alt="Infrastructure"/>
+
+---
+
+#### 16. Autonomy
+<img src="assets/tabs/16-autonomy.png" width="100%" alt="Autonomy"/>
+
+---
+
+#### 17. Velocity
+<img src="assets/tabs/17-velocity.png" width="100%" alt="Velocity"/>
 
 </div>
 </details>
@@ -329,6 +339,8 @@ flowchart TB
 | 13 | **Supermemory** | 5K items, 871 learnings, 152 reviews due | Spaced Rep |
 | 14 | **Cognitive** | Flow state, fate prediction, energy map | Line + Heatmap |
 | 15 | **Infrastructure** | 8/8 daemons, 1.2K heals, 89% recovery | Status Grid |
+| 16 | **Autonomy** | Streak detection, longest runs, tool patterns | Timeline + Bars |
+| 17 | **Velocity** | 10D vector field, VAAC signals, composition | Radar + Line |
 
 <br/>
 
@@ -525,7 +537,7 @@ curl http://localhost:8766/api/health
 
 ```bash
 make help        # Show all targets
-make test        # Run test suite (42 tests)
+make test        # Run test suite (138 tests)
 make lint        # Lint with ruff
 make typecheck   # Type check with mypy
 make backup      # Backup SQLite database
@@ -582,7 +594,7 @@ python3 scripts/ccc-intelligence-layer.py
 
 | Layer | File | Size | Purpose |
 |:-----:|:-----|:----:|:--------|
-| 🖥️ | `dashboard/claude-command-center.html` | 505K | 15-tab generated dashboard |
+| 🖥️ | `dashboard/claude-command-center.html` | 505K | 17-tab generated dashboard |
 | 🚀 | `scripts/ccc-api-server.py` | 26K | Live server + SSE streaming |
 | ⚙️ | `scripts/ccc-generator.sh` | 78K | Static HTML generator |
 | 🗄️ | `scripts/ccc-sql-data.py` | 23K | SQLite → JSON exporter |
@@ -602,7 +614,7 @@ python3 scripts/ccc-intelligence-layer.py
 | 📐 | `config/schema.sql` | 14K | Database schema (20 tables, 42 indexes, 6 views) |
 | 💿 | `scripts/ccc-backup.py` | 3K | SQLite backup with rotation |
 | 🔧 | `deploy/com.claude.api-server.plist` | <1K | LaunchAgent daemon config |
-| 🧪 | `tests/` | 12K | 42 tests (API, datastore, backup) |
+| 🧪 | `tests/` | 12K | 138 tests (API, SQL data, self-heal, datastore, backup) |
 
 <br/>
 
@@ -748,13 +760,13 @@ fuser ~/.claude/data/claude.db 2>/dev/null
 | 2026-02-12 | Live SSE streaming | Real-time dashboard with 3s updates, LIVE indicator |
 | 2026-02-12 | Token pipeline fix | Backfilled daily_stats from sessions table (79 rows) |
 | 2026-02-12 | Recovery data fix | Mapped SQLite Row objects to proper JS format |
-| 2026-02-12 | 15-tab audit | All tabs verified clean (zero undefined/NaN/Invalid Date) |
+| 2026-02-12 | 17-tab audit | All tabs verified clean (zero undefined/NaN/Invalid Date) |
 | 2026-02-12 | Private repo created | 20 files, 16,613 lines committed |
 | 2026-01-31 | Self-healing engine | 8 error patterns, 89% recovery rate |
 | 2026-01-29 | Autonomous brain | Pattern detection + anomaly alerts |
 | 2026-01-21 | SQLite migration | Replaced JSONL files with unified database |
 | 2026-01-19 | Intelligence layer | Leverage point analysis |
-| 2026-01-17 | 15-tab dashboard | Full analytics suite with Chart.js |
+| 2026-01-17 | 17-tab dashboard | Full analytics suite with Chart.js |
 | 2026-01-14 | Initial API server | REST endpoints on port 8766 |
 | 2026-01-09 | Watchdog + Bootstrap | LaunchAgent daemon infrastructure |
 

@@ -26,17 +26,19 @@ CLAUDE_DIR = HOME / ".claude"
 LAUNCH_AGENTS = HOME / "Library/LaunchAgents"
 LOG_FILE = CLAUDE_DIR / "logs/watchdog.log"
 
-# All daemons that must stay alive (watchdog monitors all except itself)
+# Core daemons that must stay alive (watchdog monitors all except itself)
+# Audited 2026-03-07: reduced from 9 to 4 critical daemons
+#   KEEP: api-server (KeepAlive, serves dashboard), dashboard-refresh (60s regenerate),
+#         self-heal (6h health scan), supermemory (6h memory sync)
+#   ONE-SHOT: bootstrap, wake-hook (run on login/wake only — no PID expected)
+#   PERIODIC: autonomous-brain (5m), session-analysis (30m), capability-sync (6h),
+#             autonomous-maintenance (manual), weekly-backfill (manual)
+#   REMOVE: autopilot (KeepAlive but crash-looping, exit -15)
 CRITICAL_DAEMONS = [
+    "com.claude.api-server",
     "com.claude.dashboard-refresh",
-    "com.claude.supermemory",
-    "com.claude.session-analysis",
-    "com.claude.autonomous-maintenance",
     "com.claude.self-heal",
-    "com.claude.bootstrap",
-    "com.claude.wake-hook",
-    "com.claude.autonomous-brain",
-    "com.claude.capability-sync",
+    "com.claude.supermemory",
 ]
 
 

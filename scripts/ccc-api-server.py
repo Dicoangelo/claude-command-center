@@ -24,6 +24,7 @@ Run: python3 ccc-api-server.py [--port 8766]
 import hashlib
 import importlib.util
 import json
+import socket
 import sqlite3
 import sys
 import threading
@@ -1556,6 +1557,25 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
+def _kill_stale_server(port: int) -> None:
+    """Kill any process occupying the target port."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True, text=True, timeout=5,
+        )
+        pids = result.stdout.strip().split("\n")
+        for pid in pids:
+            if pid.strip():
+                print(f"Killing stale process on port {port}: PID {pid}")
+                subprocess.run(["kill", "-9", pid.strip()], timeout=5)
+                time.sleep(0.3)
+    except Exception:
+        pass
+
+
 def main() -> None:
     port = PORT
     if "--port" in sys.argv:
@@ -1563,10 +1583,14 @@ def main() -> None:
         if idx + 1 < len(sys.argv):
             port = int(sys.argv[idx + 1])
 
+    # Kill any stale server on this port
+    _kill_stale_server(port)
+
     # Start the data streamer background thread
     streamer.start()
 
     server = ThreadingHTTPServer(("localhost", port), CCCAPIHandler)
+    server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     print(f"CCC Live Server running on http://localhost:{port}")
     print(f"Dashboard: http://localhost:{port}/dashboard")
     print(f"SSE Stream: http://localhost:{port}/api/stream")

@@ -56,7 +56,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.0.0] - 2026-02-12
 
 ### Added
-- 15-tab real-time analytics dashboard
+- 17-tab real-time analytics dashboard
 - SSE streaming with 3s polling, MD5 change detection, multi-client broadcast
 - 12 REST API endpoints + 1 SSE stream
 - Self-healing engine with 8 error patterns and 89% recovery rate
