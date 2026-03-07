@@ -39,6 +39,7 @@ CLAUDE_DIR = HOME / ".claude"
 DB_PATH = CLAUDE_DIR / "data" / "claude.db"
 ANTIGRAVITY_DB = HOME / ".agent-core" / "storage" / "antigravity.db"
 DASHBOARD_HTML = CLAUDE_DIR / "dashboard" / "claude-command-center.html"
+PRESENTATION_HTML = CLAUDE_DIR / "dashboard" / "presentation.html"
 PORT = 8766
 
 # Import pricing config
@@ -236,7 +237,8 @@ class DataStreamer:
         try:
             coord_dir = CLAUDE_DIR / "coordinator"
             sys.path.insert(0, str(coord_dir))
-            from velocity_field import VelocityField, DIM_NAMES
+            from velocity_field import DIM_NAMES, VelocityField
+
             field = VelocityField()
             vector = field.sample()
             composition = field.compose(vector)
@@ -717,6 +719,7 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
 
         routes = {
             "/dashboard": self.serve_dashboard,
+            "/presentation": self.serve_presentation,
             "/api/stream": self.serve_sse,
             "/api/stats": self.get_stats,
             "/api/cost": self.get_cost,
@@ -765,6 +768,18 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         else:
             html += SSE_CLIENT_JS
 
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.end_headers()
+        self.wfile.write(html.encode("utf-8"))
+
+    def serve_presentation(self, params: Dict[str, List[str]]) -> None:
+        """Serve clean presentation HTML for live demos."""
+        if not PRESENTATION_HTML.exists():
+            self.send_json({"error": "presentation.html not found"}, 404)
+            return
+        html = PRESENTATION_HTML.read_text(encoding="utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -929,7 +944,10 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             cutoff = int(datetime.now().timestamp()) - (days * 86400)
 
             # Top tools by call count
-            usage = [dict(r) for r in conn.execute("""
+            usage = [
+                dict(r)
+                for r in conn.execute(
+                    """
                 SELECT tool_name, count(*) as total_calls,
                        sum(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count,
                        sum(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failure_count,
@@ -937,43 +955,65 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
                        round(100.0 * sum(CASE WHEN success = 1 THEN 1 ELSE 0 END) / count(*), 1) as success_rate
                 FROM tool_events WHERE timestamp > ?
                 GROUP BY tool_name ORDER BY total_calls DESC
-            """, (cutoff,)).fetchall()]
+            """,
+                    (cutoff,),
+                ).fetchall()
+            ]
 
             # Failing tools (lowest success rate with >5 calls)
-            failing = [dict(r) for r in conn.execute("""
+            failing = [
+                dict(r)
+                for r in conn.execute(
+                    """
                 SELECT tool_name, count(*) as total,
                        round(100.0 * sum(CASE WHEN success = 1 THEN 1 ELSE 0 END) / count(*), 1) as success_rate
                 FROM tool_events WHERE timestamp > ?
                 GROUP BY tool_name HAVING count(*) > 5
                 ORDER BY success_rate ASC LIMIT 10
-            """, (cutoff,)).fetchall()]
+            """,
+                    (cutoff,),
+                ).fetchall()
+            ]
 
             # Hourly tool activity pattern
-            hourly = [dict(r) for r in conn.execute("""
+            hourly = [
+                dict(r)
+                for r in conn.execute(
+                    """
                 SELECT cast(strftime('%H', timestamp, 'unixepoch', 'localtime') as integer) as hour,
                        count(*) as calls
                 FROM tool_events WHERE timestamp > ?
                 GROUP BY hour ORDER BY hour
-            """, (cutoff,)).fetchall()]
+            """,
+                    (cutoff,),
+                ).fetchall()
+            ]
 
             # Total stats
-            totals = dict(conn.execute("""
+            totals = dict(
+                conn.execute(
+                    """
                 SELECT count(*) as total_events,
                        count(DISTINCT tool_name) as unique_tools,
                        round(100.0 * sum(CASE WHEN success = 1 THEN 1 ELSE 0 END) / count(*), 1) as overall_success_rate,
                        round(avg(duration_ms), 1) as avg_duration
                 FROM tool_events WHERE timestamp > ?
-            """, (cutoff,)).fetchone())
+            """,
+                    (cutoff,),
+                ).fetchone()
+            )
 
             conn.close()
-            self.send_json({
-                "usage": usage,
-                "failing": failing,
-                "hourly": hourly,
-                "totals": totals,
-                "days": days,
-                "total_usage": len(usage),
-            })
+            self.send_json(
+                {
+                    "usage": usage,
+                    "failing": failing,
+                    "hourly": hourly,
+                    "totals": totals,
+                    "days": days,
+                    "total_usage": len(usage),
+                }
+            )
         except Exception as e:
             # Fallback to old JSONL if SQLite fails
             limit = int(params.get("limit", [100])[0])
@@ -1032,13 +1072,15 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             sys.path.insert(0, str(coord_dir))
 
             # Sample velocity field
-            from velocity_field import VelocityField, DIM_NAMES
+            from velocity_field import DIM_NAMES, VelocityField
+
             field = VelocityField()
             vector = field.sample()
             composition = field.compose(vector)
 
             # Get VAAC 3-signal aggregation
             from velocity import VelocitySignalAggregator
+
             agg = VelocitySignalAggregator()
             vaac_status = agg.get_velocity_status()
 
@@ -1053,14 +1095,16 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
                         except Exception:
                             pass
 
-            self.send_json({
-                "field": vector.to_dict(),
-                "composition": composition.to_dict(),
-                "vaac": vaac_status,
-                "history": history,
-                "dim_names": DIM_NAMES,
-                "timestamp": datetime.now().isoformat(),
-            })
+            self.send_json(
+                {
+                    "field": vector.to_dict(),
+                    "composition": composition.to_dict(),
+                    "vaac": vaac_status,
+                    "history": history,
+                    "dim_names": DIM_NAMES,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
         except Exception as e:
             self.send_json({"error": str(e)}, 500)
 
@@ -1090,9 +1134,12 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
         """
         try:
             import subprocess
+
             result = subprocess.run(
                 ["python3", str(Path(__file__).parent / "ccc-sql-data.py"), "all"],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode == 0:
                 self.send_json(json.loads(result.stdout))
@@ -1110,27 +1157,42 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             cutoff = int(datetime.now().timestamp()) - (days * 86400)
 
             # Domain × Model heatmap
-            heatmap = [dict(r) for r in conn.execute("""
+            heatmap = [
+                dict(r)
+                for r in conn.execute(
+                    """
                 SELECT domain, chosen_model as model, count(*) as count,
                        round(avg(expertise_level), 2) as avg_expertise,
                        round(avg(query_complexity), 2) as avg_complexity
                 FROM expertise_routing_events WHERE timestamp > ?
                 GROUP BY domain, chosen_model
                 ORDER BY count DESC
-            """, (cutoff,)).fetchall()]
+            """,
+                    (cutoff,),
+                ).fetchall()
+            ]
 
             # Domain summary
-            domains = [dict(r) for r in conn.execute("""
+            domains = [
+                dict(r)
+                for r in conn.execute(
+                    """
                 SELECT domain, count(*) as total_queries,
                        round(avg(expertise_level), 2) as avg_expertise,
                        round(avg(query_complexity), 2) as avg_complexity,
                        group_concat(DISTINCT chosen_model) as models_used
                 FROM expertise_routing_events WHERE timestamp > ?
                 GROUP BY domain ORDER BY total_queries DESC
-            """, (cutoff,)).fetchall()]
+            """,
+                    (cutoff,),
+                ).fetchall()
+            ]
 
             # Model preference by domain (which model dominates each domain)
-            preferences = [dict(r) for r in conn.execute("""
+            preferences = [
+                dict(r)
+                for r in conn.execute(
+                    """
                 SELECT domain, chosen_model as dominant_model,
                        count(*) as count,
                        round(100.0 * count(*) / (
@@ -1147,10 +1209,16 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
                     )
                 )
                 ORDER BY count DESC
-            """, (cutoff, cutoff, cutoff)).fetchall()]
+            """,
+                    (cutoff, cutoff, cutoff),
+                ).fetchall()
+            ]
 
             # Complexity distribution
-            complexity_dist = [dict(r) for r in conn.execute("""
+            complexity_dist = [
+                dict(r)
+                for r in conn.execute(
+                    """
                 SELECT
                     CASE
                         WHEN query_complexity < 0.3 THEN 'low'
@@ -1163,26 +1231,36 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
                 FROM expertise_routing_events WHERE timestamp > ?
                 GROUP BY level, model
                 ORDER BY level, count DESC
-            """, (cutoff,)).fetchall()]
+            """,
+                    (cutoff,),
+                ).fetchall()
+            ]
 
             # Totals
-            totals = dict(conn.execute("""
+            totals = dict(
+                conn.execute(
+                    """
                 SELECT count(*) as total_events,
                        count(DISTINCT domain) as unique_domains,
                        round(avg(expertise_level), 2) as avg_expertise,
                        round(avg(query_complexity), 2) as avg_complexity
                 FROM expertise_routing_events WHERE timestamp > ?
-            """, (cutoff,)).fetchone())
+            """,
+                    (cutoff,),
+                ).fetchone()
+            )
 
             conn.close()
-            self.send_json({
-                "heatmap": heatmap,
-                "domains": domains,
-                "preferences": preferences,
-                "complexity_dist": complexity_dist,
-                "totals": totals,
-                "days": days,
-            })
+            self.send_json(
+                {
+                    "heatmap": heatmap,
+                    "domains": domains,
+                    "preferences": preferences,
+                    "complexity_dist": complexity_dist,
+                    "totals": totals,
+                    "days": days,
+                }
+            )
         except Exception as e:
             self.send_json({"error": str(e)}, 500)
 
@@ -1193,7 +1271,9 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             conn.row_factory = sqlite3.Row
 
             # Model preference (normalize aliases)
-            model_usage = [dict(r) for r in conn.execute("""
+            model_usage = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT CASE
                     WHEN lower(command) IN ('co','opus') THEN 'opus'
                     WHEN lower(command) IN ('cc','sonnet') THEN 'sonnet'
@@ -1201,42 +1281,53 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
                     ELSE 'other'
                 END as model, count(*) as count
                 FROM command_events GROUP BY model ORDER BY count DESC
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Top commands
-            top_commands = [dict(r) for r in conn.execute("""
+            top_commands = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT command, count(*) as count,
                        round(avg(execution_time_ms), 0) as avg_ms
                 FROM command_events
                 WHERE command != ''
                 GROUP BY command ORDER BY count DESC LIMIT 15
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Daily timeline
-            daily = [dict(r) for r in conn.execute("""
+            daily = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT date(timestamp, 'unixepoch', 'localtime') as day,
                        count(*) as total,
                        sum(CASE WHEN lower(command) IN ('co','opus') THEN 1 ELSE 0 END) as opus,
                        sum(CASE WHEN lower(command) IN ('cc','sonnet') THEN 1 ELSE 0 END) as sonnet,
                        sum(CASE WHEN lower(command) IN ('cq','haiku') THEN 1 ELSE 0 END) as haiku
                 FROM command_events GROUP BY day ORDER BY day
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Totals
-            totals = dict(conn.execute("""
+            totals = dict(
+                conn.execute("""
                 SELECT count(*) as total_commands,
                        count(DISTINCT command) as unique_commands,
                        count(DISTINCT date(timestamp, 'unixepoch', 'localtime')) as active_days
             FROM command_events
-            """).fetchone())
+            """).fetchone()
+            )
 
             conn.close()
-            self.send_json({
-                "model_usage": model_usage,
-                "top_commands": top_commands,
-                "daily": daily,
-                "totals": totals,
-            })
+            self.send_json(
+                {
+                    "model_usage": model_usage,
+                    "top_commands": top_commands,
+                    "daily": daily,
+                    "totals": totals,
+                }
+            )
         except Exception as e:
             self.send_json({"error": str(e)}, 500)
 
@@ -1247,7 +1338,9 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             conn.row_factory = sqlite3.Row
 
             # By strategy
-            by_strategy = [dict(r) for r in conn.execute("""
+            by_strategy = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT COALESCE(NULLIF(strategy, ''), 'unnamed') as strategy,
                        count(*) as total,
                        sum(CASE WHEN action = 'complete' THEN 1 ELSE 0 END) as completed,
@@ -1255,49 +1348,63 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
                        sum(CASE WHEN action = 'timeout' THEN 1 ELSE 0 END) as timed_out,
                        round(avg(duration_ms), 0) as avg_duration_ms
                 FROM coordinator_events GROUP BY strategy ORDER BY total DESC
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # By action
-            by_action = [dict(r) for r in conn.execute("""
+            by_action = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT action, count(*) as count
                 FROM coordinator_events GROUP BY action ORDER BY count DESC
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Timeline
-            daily = [dict(r) for r in conn.execute("""
+            daily = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT date(timestamp, 'unixepoch', 'localtime') as day,
                        count(*) as total,
                        sum(CASE WHEN action = 'complete' THEN 1 ELSE 0 END) as completed,
                        sum(CASE WHEN action = 'fail' THEN 1 ELSE 0 END) as failed
                 FROM coordinator_events GROUP BY day ORDER BY day
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Recent events
-            recent = [dict(r) for r in conn.execute("""
+            recent = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT id, datetime(timestamp, 'unixepoch', 'localtime') as time,
                        agent_id, action, strategy, duration_ms, exit_code,
                        substr(result, 1, 80) as result_preview
                 FROM coordinator_events ORDER BY timestamp DESC LIMIT 15
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Totals
-            totals = dict(conn.execute("""
+            totals = dict(
+                conn.execute("""
                 SELECT count(*) as total_events,
                        count(DISTINCT agent_id) as unique_agents,
                        sum(CASE WHEN action = 'complete' THEN 1 ELSE 0 END) as total_completed,
                        sum(CASE WHEN action = 'fail' THEN 1 ELSE 0 END) as total_failed,
                        round(100.0 * sum(CASE WHEN action = 'complete' THEN 1 ELSE 0 END) / max(count(*), 1), 1) as success_rate
                 FROM coordinator_events
-            """).fetchone())
+            """).fetchone()
+            )
 
             conn.close()
-            self.send_json({
-                "by_strategy": by_strategy,
-                "by_action": by_action,
-                "daily": daily,
-                "recent": recent,
-                "totals": totals,
-            })
+            self.send_json(
+                {
+                    "by_strategy": by_strategy,
+                    "by_action": by_action,
+                    "daily": daily,
+                    "recent": recent,
+                    "totals": totals,
+                }
+            )
         except Exception as e:
             self.send_json({"error": str(e)}, 500)
 
@@ -1312,7 +1419,9 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             row = conn.execute("SELECT count(*) as c FROM crm_contacts").fetchone()
             stats["total_contacts"] = row["c"] if row else 0
 
-            row = conn.execute("SELECT count(*) as c, sum(value) as v FROM crm_deals WHERE stage NOT IN ('won','lost')").fetchone()
+            row = conn.execute(
+                "SELECT count(*) as c, sum(value) as v FROM crm_deals WHERE stage NOT IN ('won','lost')"
+            ).fetchone()
             stats["active_deals"] = row["c"] if row else 0
             stats["pipeline_value"] = round(row["v"] or 0, 2) if row else 0
 
@@ -1329,55 +1438,72 @@ class CCCAPIHandler(BaseHTTPRequestHandler):
             stats["follow_ups_due"] = row["c"] if row else 0
 
             # Contacts with deal + interaction counts
-            contacts = [dict(r) for r in conn.execute("""
+            contacts = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT c.id, c.name, c.company, c.role, c.category, c.x_handle, c.email, c.source,
                        count(DISTINCT d.id) as deals, count(DISTINCT i.id) as interactions
                 FROM crm_contacts c
                 LEFT JOIN crm_deals d ON d.contact_id = c.id
                 LEFT JOIN crm_interactions i ON i.contact_id = c.id
                 GROUP BY c.id ORDER BY c.updated_at DESC
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Deals with contact names
-            deals = [dict(r) for r in conn.execute("""
+            deals = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT d.*, c.name as contact_name
                 FROM crm_deals d LEFT JOIN crm_contacts c ON d.contact_id = c.id
                 ORDER BY CASE d.stage
                     WHEN 'prospect' THEN 1 WHEN 'contacted' THEN 2 WHEN 'meeting' THEN 3
                     WHEN 'proposal' THEN 4 WHEN 'negotiation' THEN 5 WHEN 'won' THEN 6 WHEN 'lost' THEN 7 END,
                     d.updated_at DESC
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Recent interactions
-            interactions = [dict(r) for r in conn.execute("""
+            interactions = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT i.*, c.name as contact_name
                 FROM crm_interactions i LEFT JOIN crm_contacts c ON i.contact_id = c.id
                 ORDER BY i.created_at DESC LIMIT 20
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Follow-ups due
-            follow_ups = [dict(r) for r in conn.execute("""
+            follow_ups = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT c.name, c.company, i.follow_up, i.follow_up_date, i.type
                 FROM crm_interactions i JOIN crm_contacts c ON i.contact_id = c.id
                 WHERE i.follow_up IS NOT NULL AND i.follow_up_date <= date('now', '+7 days')
                 ORDER BY i.follow_up_date
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             # Category breakdown
-            categories = [dict(r) for r in conn.execute("""
+            categories = [
+                dict(r)
+                for r in conn.execute("""
                 SELECT category, count(*) as count FROM crm_contacts GROUP BY category ORDER BY count DESC
-            """).fetchall()]
+            """).fetchall()
+            ]
 
             conn.close()
 
-            self.send_json({
-                "stats": stats,
-                "contacts": contacts,
-                "deals": deals,
-                "interactions": interactions,
-                "follow_ups": follow_ups,
-                "categories": categories,
-            })
+            self.send_json(
+                {
+                    "stats": stats,
+                    "contacts": contacts,
+                    "deals": deals,
+                    "interactions": interactions,
+                    "follow_ups": follow_ups,
+                    "categories": categories,
+                }
+            )
         except Exception as e:
             self.send_json({"error": str(e)}, 500)
 

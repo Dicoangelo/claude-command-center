@@ -9,6 +9,7 @@ prompt, user input, idle time).
 Usage:
     python3 scripts/backfill-autonomy-streaks.py [--threshold 30] [--min-duration 60]
 """
+
 import argparse
 import json
 import os
@@ -19,7 +20,7 @@ from datetime import datetime, timedelta
 
 DB_PATH = os.path.expanduser("~/.claude/data/claude.db")
 GAP_THRESHOLD = 30  # seconds — gaps larger than this = interruption
-MIN_DURATION = 60   # seconds — only store streaks longer than 1 minute
+MIN_DURATION = 60  # seconds — only store streaks longer than 1 minute
 
 
 def get_session_for_timestamp(cur, ts):
@@ -72,15 +73,17 @@ def compute_streaks(db_path, gap_threshold, min_duration):
                 project_freq = Counter(run_contexts).most_common(10)
                 projects = [p for p, _ in project_freq]
 
-                streaks.append({
-                    "start_ts": run_start,
-                    "end_ts": run_end,
-                    "duration_seconds": duration,
-                    "tool_count": len(run_tools),
-                    "avg_gap_seconds": round(duration / max(len(run_tools) - 1, 1), 2),
-                    "projects": projects,
-                    "top_tools": dict(tool_freq),
-                })
+                streaks.append(
+                    {
+                        "start_ts": run_start,
+                        "end_ts": run_end,
+                        "duration_seconds": duration,
+                        "tool_count": len(run_tools),
+                        "avg_gap_seconds": round(duration / max(len(run_tools) - 1, 1), 2),
+                        "projects": projects,
+                        "top_tools": dict(tool_freq),
+                    }
+                )
 
             # Start new run
             run_start = ts
@@ -95,15 +98,17 @@ def compute_streaks(db_path, gap_threshold, min_duration):
             tool_freq = Counter(run_tools).most_common(10)
             project_freq = Counter(run_contexts).most_common(10)
             projects = [p for p, _ in project_freq]
-            streaks.append({
-                "start_ts": run_start,
-                "end_ts": run_end,
-                "duration_seconds": duration,
-                "tool_count": len(run_tools),
-                "avg_gap_seconds": round(duration / max(len(run_tools) - 1, 1), 2),
-                "projects": projects,
-                "top_tools": dict(tool_freq),
-            })
+            streaks.append(
+                {
+                    "start_ts": run_start,
+                    "end_ts": run_end,
+                    "duration_seconds": duration,
+                    "tool_count": len(run_tools),
+                    "avg_gap_seconds": round(duration / max(len(run_tools) - 1, 1), 2),
+                    "projects": projects,
+                    "top_tools": dict(tool_freq),
+                }
+            )
 
     print(f"Found {len(streaks):,} streaks >= {min_duration}s")
 
@@ -166,7 +171,7 @@ def main():
     args = parser.parse_args()
 
     start = time.time()
-    streaks = compute_streaks(args.db, args.threshold, args.min_duration)
+    compute_streaks(args.db, args.threshold, args.min_duration)
     elapsed = time.time() - start
     print(f"\nCompleted in {elapsed:.1f}s")
 

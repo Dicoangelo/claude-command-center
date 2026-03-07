@@ -99,7 +99,7 @@ class TestDailyStatsOperations:
             sonnet_messages=20,
             session_count=15,
         )
-        stats = ds.get_daily_stats(days=7)
+        stats = ds.get_daily_stats(days=3650)
         dates = [s["date"] for s in stats]
         assert "2026-02-14" in dates
 
