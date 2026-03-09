@@ -1,0 +1,234 @@
+{
+  "name": "CCC Data Intelligence Upgrade",
+  "branchName": "ralph/ccc-data-intelligence",
+  "description": "Capture uncaptured gold mine data from antigravity.db, supermemory.db, and 12 JSONL files into claude.db. Add Research, Cost, and Pipeline Health dashboard tabs. Eliminate silent pipeline failures.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Cost Tracking Table + Backfill",
+      "description": "As a dashboard user, I want to see actual API cost data so that I can track spend trends and ROI accurately.",
+      "acceptanceCriteria": [
+        "Create cost_events table in config/schema.sql: (id INTEGER PRIMARY KEY, timestamp INTEGER, model TEXT, input_tokens INTEGER, output_tokens INTEGER, cache_tokens INTEGER, cost_usd REAL, session_id TEXT)",
+        "Add cost backfill function to fix-data-flows.py reading from cost-tracking.jsonl (2,757 entries)",
+        "Backfill is incremental — only inserts entries newer than MAX(timestamp)",
+        "Add /api/cost-detail endpoint returning daily cost breakdown by model",
+        "SELECT COUNT(*) FROM cost_events > 2000 after backfill",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "cost-tracking.jsonl has fields: ts, model, input_tokens, output_tokens, cache_read, cost_usd. Located at ~/.claude/data/cost-tracking.jsonl",
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "DQ Score History Table + Backfill",
+      "description": "As a dashboard user, I want full DQ scoring history so that I can see routing quality trends over time.",
+      "acceptanceCriteria": [
+        "Create dq_score_events table: (id INTEGER PRIMARY KEY, timestamp INTEGER, query_hash TEXT, model TEXT, dq_score REAL, validity REAL, specificity REAL, correctness REAL, complexity REAL, routing_method TEXT)",
+        "Backfill from ~/.claude/kernel/dq-scores.jsonl (4,940 entries)",
+        "Backfill from antigravity.db dq_scores table (1,620 entries), dedup by timestamp",
+        "Incremental — only inserts entries newer than MAX(timestamp)",
+        "Add /api/dq-history endpoint with daily averages and trend data",
+        "SELECT COUNT(*) FROM dq_score_events > 4000 after backfill",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "dq-scores.jsonl fields: timestamp, dq_score, validity, specificity, correctness, model, complexity, method. antigravity.db path: ~/.agent-core/storage/antigravity.db",
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "Research Intelligence Tables + Backfill",
+      "description": "As a dashboard user, I want to see my research corpus (papers, findings, URLs) so that I can track knowledge accumulation.",
+      "acceptanceCriteria": [
+        "Create research_findings table: (id INTEGER PRIMARY KEY, timestamp INTEGER, content TEXT, source TEXT, tier INTEGER, category TEXT, session_id TEXT, quality_score REAL)",
+        "Create research_papers table: (id INTEGER PRIMARY KEY, arxiv_id TEXT UNIQUE, title TEXT, relevance_score REAL, added_at INTEGER, category TEXT)",
+        "Backfill findings from antigravity.db findings table (33,240 rows) using ATTACH DATABASE",
+        "Backfill papers from antigravity.db papers table (1,424 rows)",
+        "Add /api/research endpoint returning totals, top 10 papers by relevance, recent findings",
+        "SELECT COUNT(*) FROM research_findings > 30000",
+        "SELECT COUNT(*) FROM research_papers > 1000",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "antigravity.db path: ~/.agent-core/storage/antigravity.db. Open with read-only connection and short timeout. findings table has: id, content, source, tier, category, session_id, quality, created_at. papers has: id, arxiv_id, title, relevance, category.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-004",
+      "title": "Knowledge & Memory Stats Table + Backfill",
+      "description": "As a dashboard user, I want to see my knowledge graph stats so that I can track intellectual capital growth.",
+      "acceptanceCriteria": [
+        "Create knowledge_stats table: (id INTEGER PRIMARY KEY, date TEXT UNIQUE, memory_items INTEGER, learnings INTEGER, memory_links INTEGER, error_patterns INTEGER, reviews_due INTEGER)",
+        "Backfill by querying supermemory.db for current counts: memory_items (6,857), learnings (1,893), COUNT of memory_links (12.1M)",
+        "Add /api/knowledge endpoint with current totals and growth trend",
+        "SELECT COUNT(*) FROM knowledge_stats >= 1 with accurate counts",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "supermemory.db path: ~/.claude/memory/supermemory.db. memory_links has 12.1M rows — only capture COUNT(*), never SELECT *. Use read-only connection.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-005",
+      "title": "Effectiveness & Co-Evolution Backfill",
+      "description": "As a dashboard user, I want to see co-evolution effectiveness scores and applied modifications.",
+      "acceptanceCriteria": [
+        "Create effectiveness_events table: (id INTEGER PRIMARY KEY, timestamp INTEGER, metric TEXT, value REAL, context TEXT)",
+        "Create modification_events table: (id INTEGER PRIMARY KEY, timestamp INTEGER, mod_type TEXT, target TEXT, status TEXT, confidence REAL)",
+        "Backfill from ~/.claude/kernel/effectiveness.jsonl (7,905 entries)",
+        "Backfill from ~/.claude/kernel/modifications.jsonl (623 entries)",
+        "Add /api/coevolution endpoint with effectiveness trend and recent modifications",
+        "SELECT COUNT(*) FROM effectiveness_events > 7000",
+        "SELECT COUNT(*) FROM modification_events > 500",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "effectiveness.jsonl fields vary — extract timestamp + metric name + numeric value. modifications.jsonl has: timestamp, type, target, status, confidence.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-006",
+      "title": "Error Catalog Table + Backfill",
+      "description": "As a dashboard user, I want to see error patterns and resolution status for system reliability tracking.",
+      "acceptanceCriteria": [
+        "Create error_catalog table: (id INTEGER PRIMARY KEY, timestamp INTEGER, error_type TEXT, message TEXT, context TEXT, resolved INTEGER DEFAULT 0, resolution TEXT)",
+        "Backfill from ~/.claude/data/errors.jsonl (373 entries)",
+        "Backfill from antigravity.db error_patterns (39 rows)",
+        "Backfill from supermemory.db error_patterns (8 rows), dedup by error type",
+        "Add /api/errors endpoint with error frequency, resolution rate, top patterns",
+        "SELECT COUNT(*) FROM error_catalog > 350",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "errors.jsonl has: ts, type, message, context. antigravity.db error_patterns has: pattern, count, last_seen, fix. supermemory.db error_patterns has: pattern, solution, seen_count.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-007",
+      "title": "Silent Failure Elimination — Pipeline Health Logging",
+      "description": "As a maintainer, I want all data pipeline failures logged visibly so that 40-day invisible outages never happen again.",
+      "acceptanceCriteria": [
+        "Create pipeline_health table: (id INTEGER PRIMARY KEY, timestamp INTEGER, pipeline_name TEXT, status TEXT, rows_processed INTEGER, error_message TEXT, duration_ms INTEGER)",
+        "Wrap every fix-data-flows.py function in try/except that logs to pipeline_health on BOTH success AND failure",
+        "Replace all bare 'except: pass' in fix-data-flows.py with 'except Exception as e:' that logs the error",
+        "Add /api/pipeline-health endpoint showing last run status per pipeline step",
+        "Add 3 tests: pipeline_health populated on success, error logging works, endpoint returns valid JSON",
+        "SELECT COUNT(DISTINCT pipeline_name) FROM pipeline_health >= 8",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "fix-data-flows.py is at ~/.claude/scripts/fix-data-flows.py (outside git repo). The CCC repo copy at scripts/ccc-api-server.py serves the API. Pipeline names should match function names: fix_command_events, fix_self_heal_events, etc.",
+      "dependsOn": []
+    },
+    {
+      "id": "US-008",
+      "title": "Daemon Health Table + API Endpoint",
+      "description": "As a dashboard user, I want to see which daemons are running, crashed, or stale in the dashboard.",
+      "acceptanceCriteria": [
+        "Create daemon_health table: (id INTEGER PRIMARY KEY, timestamp INTEGER, daemon_name TEXT, status TEXT, pid INTEGER, exit_code INTEGER)",
+        "Add daemon health check to fix-data-flows.py: parse 'launchctl list | grep com.claude' and write results to daemon_health",
+        "Add /api/daemons endpoint returning current daemon states with PIDs and status",
+        "SSE heartbeat events include daemon count and any unhealthy daemons",
+        "SELECT COUNT(*) FROM daemon_health > 0 with accurate states",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "13 Claude LaunchAgents exist. Parse launchctl output format: 'PID\\tExitCode\\tLabel'. PID '-' means not running. Exit code -15 or -9 means crash.",
+      "dependsOn": ["US-007"]
+    },
+    {
+      "id": "US-009",
+      "title": "Research Intelligence Dashboard Tab (Tab 18)",
+      "description": "As a dashboard user, I want a Research tab showing papers, findings, and knowledge growth.",
+      "acceptanceCriteria": [
+        "Add tab 18 'Research' to dashboard HTML with keyboard shortcut",
+        "Display total findings count, total papers, top 10 papers by relevance score",
+        "Chart.js line chart: findings accumulation over time (monthly buckets)",
+        "Chart.js bar chart: papers by category",
+        "Data sourced from /api/research endpoint",
+        "Take Chrome DevTools screenshot saved to assets/tabs/18-research.png",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Follow existing tab pattern in dashboard HTML. Use Chart.js (already loaded). Match dark theme styling of existing tabs.",
+      "dependsOn": ["US-003"]
+    },
+    {
+      "id": "US-010",
+      "title": "Cost Intelligence Dashboard Tab (Tab 19)",
+      "description": "As a dashboard user, I want a Cost tab showing actual spend, cost per session, and model efficiency.",
+      "acceptanceCriteria": [
+        "Add tab 19 'Cost Detail' to dashboard HTML with keyboard shortcut",
+        "Chart.js line chart: daily cost trend over last 30 days",
+        "Chart.js stacked bar: cost by model (opus/sonnet/haiku)",
+        "Display: cost per message, predicted monthly spend, comparison to $200/day subscription",
+        "Data sourced from /api/cost-detail endpoint",
+        "Take Chrome DevTools screenshot saved to assets/tabs/19-cost.png",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "The existing Cost tab shows subscription ROI. This new tab shows granular actual spend from cost_events. Different perspective, both valuable.",
+      "dependsOn": ["US-001"]
+    },
+    {
+      "id": "US-011",
+      "title": "Pipeline + Daemon Health in Infrastructure Tab",
+      "description": "As a dashboard user, I want the Infrastructure tab to show pipeline and daemon health status.",
+      "acceptanceCriteria": [
+        "Add pipeline health section to existing Infrastructure tab (tab 15)",
+        "Show last run time per pipeline, status indicator (green/yellow/red), rows processed",
+        "Show daemon fleet status table with name, PID, status, exit code",
+        "Red indicator if any pipeline failed in last 24 hours or any critical daemon is down",
+        "Data sourced from /api/pipeline-health and /api/daemons endpoints",
+        "Take Chrome DevTools screenshot to verify",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Infrastructure tab already exists. Add sections below existing content. Critical daemons: api-server, dashboard-refresh, self-heal, supermemory.",
+      "dependsOn": ["US-007", "US-008"]
+    },
+    {
+      "id": "US-012",
+      "title": "Schema Migration System",
+      "description": "As a maintainer, I want a simple migration system so that table changes are applied automatically on startup.",
+      "acceptanceCriteria": [
+        "Create scripts/migrate.py that reads config/migrations/ directory",
+        "Each migration is a numbered .sql file: 001_add_cost_events.sql, 002_add_dq_score_events.sql, etc.",
+        "Track applied migrations in metadata table (already exists): key='migration_NNN', value='applied', updated_at=timestamp",
+        "migrate.py runs idempotently — safe to run multiple times",
+        "Create migration .sql files for ALL new tables from US-001 through US-008 (8 files minimum)",
+        "Add test: verify migrations apply idempotently (run twice, no errors)",
+        "Add test: verify all new tables exist after migration",
+        "python3 -m pytest tests/ -v passes",
+        "ruff check scripts/ tests/ passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Keep it simple — stdlib only. Read .sql files sorted by name, check metadata table for applied, execute if not applied. No rollback needed (we use IF NOT EXISTS in all CREATE statements).",
+      "dependsOn": []
+    }
+  ]
+}
