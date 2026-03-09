@@ -1005,18 +1005,23 @@ def main() -> int:
     else:
         engine.print_summary()
 
-    # Log outcome with dual-write to JSONL + SQLite
+    # Log outcome to JSONL + SQLite
     try:
-        int(now_local().timestamp())
+        ts = int(now_local().timestamp())
         ok_count = engine.report()["ok"]
         warn_count = engine.report()["warnings"]
         error_count = engine.report()["errors"]
         fixed_count = engine.report()["fixes_successful"]
 
-        # Import dual-write library
+        # Write to JSONL (source of truth for fix-data-flows backfill)
+        import json as _json
+        jsonl_path = HOME / ".claude/data/self-heal-outcomes.jsonl"
+        with open(jsonl_path, "a") as f:
+            f.write(_json.dumps({"ts": ts, "ok": ok_count, "warn": warn_count, "error": error_count, "fixed": fixed_count}) + "\n")
+
+        # Also write to SQLite via dual-write library
         sys.path.insert(0, str(HOME / ".claude/hooks"))
         from dual_write_lib import log_self_heal_outcome
-
         log_self_heal_outcome(ok=ok_count, warn=warn_count, error=error_count, fixed=fixed_count)
     except Exception as e:
         sys.stderr.write(f"Warning: Failed to log self-heal outcome: {e}\n")
