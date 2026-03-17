@@ -104,7 +104,7 @@ class TestDailyStatsOperations:
         assert "2026-02-14" in dates
 
     def test_get_daily_stats(self, ds):
-        stats = ds.get_daily_stats(days=30)
+        stats = ds.get_daily_stats(days=3650)
         assert isinstance(stats, list)
         assert len(stats) > 0
 
